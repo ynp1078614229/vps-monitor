@@ -25,7 +25,7 @@ const { URL } = require('url');
 const CONFIG = {
   serverUrl: process.env.SERVER_URL || 'http://localhost:5000',
   secret: process.env.AGENT_SECRET || '',
-  interval: parseInt(process.env.INTERVAL || '30', 10) * 1000,
+  interval: parseInt(process.env.INTERVAL || '5', 10) * 1000,
   serverId: process.env.SERVER_ID || os.hostname(),
   version: '1.0.0',
 };
