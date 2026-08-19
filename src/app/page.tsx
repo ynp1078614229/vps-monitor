@@ -14,6 +14,7 @@ interface ServerData {
   totalMemory: number;
   online: boolean;
   lastSeen: number;
+  remark?: string;
   latest: {
     cpuUsage: number;
     memoryUsage: number;
@@ -198,6 +199,7 @@ export default function DashboardPage() {
                 totalMemory={server.totalMemory}
                 online={server.online}
                 lastSeen={server.lastSeen}
+                remark={server.remark}
                 latest={server.latest}
                 onClick={() => setSelectedServer(server.id)}
                 onDelete={() => handleDeleteServer(server.id)}
@@ -234,6 +236,7 @@ function AddServerModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
   const [serverId, setServerId] = useState('');
   const [hostname, setHostname] = useState('');
   const [ip, setIp] = useState('');
+  const [remark, setRemark] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -247,6 +250,7 @@ function AddServerModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
           id: serverId,
           hostname: hostname || serverId,
           ip,
+          remark,
         }),
       });
       if (res.ok) {
@@ -307,6 +311,18 @@ function AddServerModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
               placeholder="例如: 192.168.1.100"
               className="w-full px-3 py-2 text-sm bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-[var(--primary)]"
               required
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-[var(--muted-foreground)] mb-1">
+              备注
+            </label>
+            <input
+              type="text"
+              value={remark}
+              onChange={(e) => setRemark(e.target.value)}
+              placeholder="例如: 生产环境 Web 服务器"
+              className="w-full px-3 py-2 text-sm bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-[var(--primary)]"
             />
           </div>
           <div className="flex gap-3 pt-2">

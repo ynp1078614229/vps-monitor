@@ -12,6 +12,7 @@ interface ServerCardProps {
   totalMemory: number;
   online: boolean;
   lastSeen: number;
+  remark?: string;
   latest: {
     cpuUsage: number;
     memoryUsage: number;
@@ -71,6 +72,7 @@ export function ServerCard({
   ip,
   online,
   lastSeen,
+  remark,
   latest,
   onClick,
   onDelete,
@@ -102,6 +104,11 @@ export function ServerCard({
             <p className="text-xs text-[var(--muted-foreground)] font-mono">
               {ip}
             </p>
+            {remark && (
+              <p className="text-xs text-[var(--muted-foreground)] mt-0.5 italic">
+                {remark}
+              </p>
+            )}
           </div>
         </div>
         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${

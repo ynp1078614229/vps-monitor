@@ -16,6 +16,7 @@ export interface ServerInfo {
   agentVersion: string;
   firstSeen: number; // timestamp ms
   lastSeen: number; // timestamp ms
+  remark?: string; // 备注
 }
 
 export interface MetricsRecord {
@@ -98,6 +99,13 @@ export function getMetricsHistory(
 
 export function removeServer(id: string): boolean {
   return servers.delete(id);
+}
+
+export function updateServerRemark(id: string, remark: string): boolean {
+  const data = servers.get(id);
+  if (!data) return false;
+  data.info.remark = remark;
+  return true;
 }
 
 /**

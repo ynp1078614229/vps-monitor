@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllServers, isServerOnline, upsertServer } from '@/lib/store';
+import { getAllServers, isServerOnline, upsertServer, updateServerRemark } from '@/lib/store';
 
 export async function GET() {
   try {
@@ -16,6 +16,7 @@ export async function GET() {
       firstSeen: data.info.firstSeen,
       lastSeen: data.info.lastSeen,
       online: isServerOnline(data),
+      remark: data.info.remark || '',
       latest: data.latest,
     }));
 
@@ -38,7 +39,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, hostname, ip } = body;
+    const { id, hostname, ip, remark } = body;
 
     if (!id || !ip) {
       return NextResponse.json(
@@ -62,6 +63,7 @@ export async function POST(request: NextRequest) {
         agentVersion: '未连接',
         firstSeen: Date.now(),
         lastSeen: Date.now(),
+        remark: remark || '',
       },
       {
         timestamp: Date.now(),
@@ -84,6 +86,36 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, message: '服务器已添加' });
   } catch (error) {
     console.error('Add server error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { id, remark } = body;
+
+    if (!id) {
+      return NextResponse.json(
+        { error: '缺少必填字段: id' },
+        { status: 400 }
+      );
+    }
+
+    const updated = updateServerRemark(id, remark || '');
+    if (!updated) {
+      return NextResponse.json(
+        { error: '服务器不存在' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ success: true, message: '备注已更新' });
+  } catch (error) {
+    console.error('Update remark error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
