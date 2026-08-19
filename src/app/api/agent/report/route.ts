@@ -20,6 +20,8 @@ interface AgentReportPayload {
     diskUsage: number;
     networkRxBytes: number;
     networkTxBytes: number;
+    totalRxBytes: number;
+    totalTxBytes: number;
     loadAvg1: number;
     loadAvg5: number;
     loadAvg15: number;
@@ -70,6 +72,8 @@ export async function POST(request: NextRequest) {
       diskUsage: body.metrics.diskUsage,
       networkRxBytes: body.metrics.networkRxBytes,
       networkTxBytes: body.metrics.networkTxBytes,
+      totalRxBytes: body.metrics.totalRxBytes || 0,
+      totalTxBytes: body.metrics.totalTxBytes || 0,
       loadAvg1: body.metrics.loadAvg1,
       loadAvg5: body.metrics.loadAvg5,
       loadAvg15: body.metrics.loadAvg15,

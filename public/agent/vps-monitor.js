@@ -137,12 +137,12 @@ function getDiskUsage() {
 }
 
 /**
- * Get network I/O rates (Linux only, reads from /proc/net/dev)
+ * Get network I/O rates and cumulative totals (Linux only, reads from /proc/net/dev)
  */
 function getNetworkStats() {
   try {
     if (process.platform !== 'linux') {
-      return { rxBytes: 0, txBytes: 0 };
+      return { rxBytes: 0, txBytes: 0, totalRx: 0, totalTx: 0 };
     }
 
     const netDev = fs.readFileSync('/proc/net/dev', 'utf8');
@@ -171,7 +171,7 @@ function getNetworkStats() {
     if (prevNetStats === null || prevNetTime === null) {
       prevNetStats = { rx: totalRx, tx: totalTx };
       prevNetTime = now;
-      return { rxBytes: 0, txBytes: 0 };
+      return { rxBytes: 0, txBytes: 0, totalRx, totalTx };
     }
 
     const timeDiff = (now - prevNetTime) / 1000; // seconds
@@ -184,10 +184,12 @@ function getNetworkStats() {
     return {
       rxBytes: Math.max(0, rxRate),
       txBytes: Math.max(0, txRate),
+      totalRx,
+      totalTx,
     };
   } catch (err) {
     console.error('[WARN] Failed to get network stats:', err.message);
-    return { rxBytes: 0, txBytes: 0 };
+    return { rxBytes: 0, txBytes: 0, totalRx: 0, totalTx: 0 };
   }
 }
 
@@ -265,6 +267,8 @@ function collectMetrics() {
     diskUsage: Math.max(0, Math.min(100, disk.usage)),
     networkRxBytes: net.rxBytes,
     networkTxBytes: net.txBytes,
+    totalRxBytes: net.totalRx,
+    totalTxBytes: net.totalTx,
     loadAvg1: load.loadAvg1,
     loadAvg5: load.loadAvg5,
     loadAvg15: load.loadAvg15,

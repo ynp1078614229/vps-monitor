@@ -20,6 +20,8 @@ interface ServerData {
     diskUsage: number;
     networkRxBytes: number;
     networkTxBytes: number;
+    totalRxBytes: number;
+    totalTxBytes: number;
     loadAvg1: number;
   } | null;
 }

@@ -25,8 +25,10 @@ export interface MetricsRecord {
   memoryUsage: number; // 0-100
   diskUsed: number; // bytes
   diskUsage: number; // 0-100
-  networkRxBytes: number; // bytes/s
-  networkTxBytes: number; // bytes/s
+  networkRxBytes: number; // bytes/s (real-time speed)
+  networkTxBytes: number; // bytes/s (real-time speed)
+  totalRxBytes: number; // cumulative bytes received
+  totalTxBytes: number; // cumulative bytes transmitted
   loadAvg1: number;
   loadAvg5: number;
   loadAvg15: number;
@@ -164,6 +166,11 @@ export function seedDemoData(): void {
       const t = now - i * 30_000;
       const cpuJitter = Math.sin(i * 0.3) * 10 + (Math.random() - 0.5) * 8;
       const memJitter = Math.sin(i * 0.1) * 5 + (Math.random() - 0.5) * 3;
+      const rxRate = 500_000 + Math.random() * 2_000_000;
+      const txRate = 200_000 + Math.random() * 1_000_000;
+      // Cumulative: grow over time (simulate 30s intervals)
+      const cumRx = (59 - i) * 30 * rxRate + Math.random() * 10_000_000_000;
+      const cumTx = (59 - i) * 30 * txRate + Math.random() * 5_000_000_000;
 
       metrics.push({
         timestamp: t,
@@ -172,8 +179,10 @@ export function seedDemoData(): void {
         memoryUsage: Math.max(0, Math.min(100, baseMem + memJitter)),
         diskUsed: (20 + Math.random() * 10) / 100 * s.totalDisk,
         diskUsage: 20 + Math.random() * 10,
-        networkRxBytes: 500_000 + Math.random() * 2_000_000,
-        networkTxBytes: 200_000 + Math.random() * 1_000_000,
+        networkRxBytes: rxRate,
+        networkTxBytes: txRate,
+        totalRxBytes: cumRx,
+        totalTxBytes: cumTx,
         loadAvg1: 0.5 + Math.random() * 2,
         loadAvg5: 0.4 + Math.random() * 1.5,
         loadAvg15: 0.3 + Math.random() * 1,
