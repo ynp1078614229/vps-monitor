@@ -1,363 +1,217 @@
-# projects
+# VPS Monitor
 
-这是一个基于 [Next.js 16](https://nextjs.org) + [shadcn/ui](https://ui.shadcn.com) 的全栈应用项目，由扣子编程 CLI 创建。
+一个轻量级的 VPS 监控系统，包含中央监控面板和部署在各 VPS 上的监控 Agent。
+
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Node.js](https://img.shields.io/badge/node.js-%3E%3D16-green.svg)
+
+## 功能特性
+
+- **实时监控**: CPU、内存、磁盘使用率
+- **网络流量**: 实时速率 + 累计流量统计
+- **多服务器管理**: 支持同时监控多台 VPS
+- **可视化图表**: 历史数据图表展示
+- **自动刷新**: 5 秒间隔自动更新数据
+- **轻量 Agent**: 无额外依赖，纯 Node.js 实现
+- **Bearer Token 认证**: 安全的 Agent 通信
+
+## 架构
+
+```
+┌─────────────────┐     HTTP POST      ┌─────────────────┐
+│   VPS Agent     │ ──────────────────► │  监控面板        │
+│  (被监控端)      │    /api/agent/report│  (中央服务器)     │
+└─────────────────┘                     └─────────────────┘
+       │                                        │
+       │ 采集系统指标                             │ 展示数据
+       ▼                                        ▼
+   CPU/内存/网络                           Web 仪表盘
+```
 
 ## 快速开始
 
-### 启动开发服务器
+### 1. 部署监控面板
+
+在中央服务器上运行：
 
 ```bash
-coze-dev dev
+curl -sSL https://raw.githubusercontent.com/YOUR_USERNAME/vps-monitor/main/deploy-server.sh | bash
 ```
 
-启动后，在浏览器中打开 [http://localhost:5000](http://localhost:5000) 查看应用。
-
-开发服务器支持热更新，修改代码后页面会自动刷新。
-
-### 构建生产版本
+或手动部署：
 
 ```bash
-coze-dev build
-```
-
-### 启动生产服务器
-
-```bash
-coze-dev start
-```
-
-## 项目结构
-
-```
-src/
-├── app/                      # Next.js App Router 目录
-│   ├── layout.tsx           # 根布局组件
-│   ├── page.tsx             # 首页
-│   ├── globals.css          # 全局样式（包含 shadcn 主题变量）
-│   └── [route]/             # 其他路由页面
-├── components/              # React 组件目录
-│   └── ui/                  # shadcn/ui 基础组件（优先使用）
-│       ├── button.tsx
-│       ├── card.tsx
-│       └── ...
-├── lib/                     # 工具函数库
-│   └── utils.ts            # cn() 等工具函数
-└── hooks/                   # 自定义 React Hooks（可选）
-
-server/
-├── index.ts                 # 自定义服务器入口
-├── tsconfig.json           # Server TypeScript 配置
-└── dist/                    # 编译输出目录（自动生成）
-```
-
-## 核心开发规范
-
-### 1. 组件开发
-
-**优先使用 shadcn/ui 基础组件**
-
-本项目已预装完整的 shadcn/ui 组件库，位于 `src/components/ui/` 目录。开发时应优先使用这些组件作为基础：
-
-```tsx
-// ✅ 推荐：使用 shadcn 基础组件
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-
-export default function MyComponent() {
-  return (
-    <Card>
-      <CardHeader>标题</CardHeader>
-      <CardContent>
-        <Input placeholder="输入内容" />
-        <Button>提交</Button>
-      </CardContent>
-    </Card>
-  );
-}
-```
-
-**可用的 shadcn 组件清单**
-
-- 表单：`button`, `input`, `textarea`, `select`, `checkbox`, `radio-group`, `switch`, `slider`
-- 布局：`card`, `separator`, `tabs`, `accordion`, `collapsible`, `scroll-area`
-- 反馈：`alert`, `alert-dialog`, `dialog`, `toast`, `sonner`, `progress`
-- 导航：`dropdown-menu`, `menubar`, `navigation-menu`, `context-menu`
-- 数据展示：`table`, `avatar`, `badge`, `hover-card`, `tooltip`, `popover`
-- 其他：`calendar`, `command`, `carousel`, `resizable`, `sidebar`
-
-详见 `src/components/ui/` 目录下的具体组件实现。
-
-### 2. 路由开发
-
-Next.js 使用文件系统路由，在 `src/app/` 目录下创建文件夹即可添加路由：
-
-```bash
-# 创建新路由 /about
-src/app/about/page.tsx
-
-# 创建动态路由 /posts/[id]
-src/app/posts/[id]/page.tsx
-
-# 创建路由组（不影响 URL）
-src/app/(marketing)/about/page.tsx
-
-# 创建 API 路由
-src/app/api/users/route.ts
-```
-
-**页面组件示例**
-
-```tsx
-// src/app/about/page.tsx
-import { Button } from '@/components/ui/button';
-
-export const metadata = {
-  title: '关于我们',
-  description: '关于页面描述',
-};
-
-export default function AboutPage() {
-  return (
-    <div>
-      <h1>关于我们</h1>
-      <Button>了解更多</Button>
-    </div>
-  );
-}
-```
-
-**动态路由示例**
-
-```tsx
-// src/app/posts/[id]/page.tsx
-export default async function PostPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-
-  return <div>文章 ID: {id}</div>;
-}
-```
-
-**API 路由示例**
-
-```tsx
-// src/app/api/users/route.ts
-import { NextResponse } from 'next/server';
-
-export async function GET() {
-  return NextResponse.json({ users: [] });
-}
-
-export async function POST(request: Request) {
-  const body = await request.json();
-  return NextResponse.json({ success: true });
-}
-```
-
-### 3. 依赖管理
-
-**必须使用 pnpm 管理依赖**
-
-```bash
-# ✅ 安装依赖
+git clone https://github.com/YOUR_USERNAME/vps-monitor.git
+cd vps-monitor
 pnpm install
-
-# ✅ 添加新依赖
-pnpm add package-name
-
-# ✅ 添加开发依赖
-pnpm add -D package-name
-
-# ❌ 禁止使用 npm 或 yarn
-# npm install  # 错误！
-# yarn add     # 错误！
+pnpm run build
+PORT=8080 pnpm run start
 ```
 
-项目已配置 `preinstall` 脚本，使用其他包管理器会报错。
+### 2. 部署监控 Agent
 
-### 4. 样式开发
+在被监控的 VPS 上运行：
 
-**使用 Tailwind CSS v4**
-
-本项目使用 Tailwind CSS v4 进行样式开发，并已配置 shadcn 主题变量。
-
-```tsx
-// 使用 Tailwind 类名
-<div className="flex items-center gap-4 p-4 rounded-lg bg-background">
-  <Button className="bg-primary text-primary-foreground">
-    主要按钮
-  </Button>
-</div>
-
-// 使用 cn() 工具函数合并类名
-import { cn } from '@/lib/utils';
-
-<div className={cn(
-  "base-class",
-  condition && "conditional-class",
-  className
-)}>
-  内容
-</div>
+```bash
+curl -sSL https://raw.githubusercontent.com/YOUR_USERNAME/vps-monitor/main/deploy-agent.sh | bash -s -- \
+  --server http://your-monitor-server:8080 \
+  --secret vps-monitor-default-secret
 ```
 
-**主题变量**
+参数说明：
+- `--server`: 监控面板地址
+- `--secret`: 认证密钥（需与面板端一致）
+- `--id`: 服务器标识（默认使用 hostname）
+- `--interval`: 上报间隔秒数（默认 5）
 
-主题变量定义在 `src/app/globals.css` 中，支持亮色/暗色模式：
+## 一键部署脚本
 
-- `--background`, `--foreground`
-- `--primary`, `--primary-foreground`
-- `--secondary`, `--secondary-foreground`
-- `--muted`, `--muted-foreground`
-- `--accent`, `--accent-foreground`
-- `--destructive`, `--destructive-foreground`
-- `--border`, `--input`, `--ring`
+### 监控面板端
 
-### 5. 表单开发
+```bash
+# 默认配置
+bash deploy-server.sh
 
-推荐使用 `react-hook-form` + `zod` 进行表单开发：
+# 自定义配置
+PORT=3000 AGENT_SECRET=my-secret bash deploy-server.sh
+```
 
-```tsx
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+### 被监控端
 
-const formSchema = z.object({
-  username: z.string().min(2, '用户名至少 2 个字符'),
-  email: z.string().email('请输入有效的邮箱'),
-});
+```bash
+bash deploy-agent.sh --server http://monitor:8080 --secret my-secret --id my-vps-01
+```
 
-export default function MyForm() {
-  const form = useForm({
-    resolver: zodResolver(formSchema),
-    defaultValues: { username: '', email: '' },
-  });
+## API 接口
 
-  const onSubmit = (data: z.infer<typeof formSchema>) => {
-    console.log(data);
-  };
+| 路径 | 方法 | 说明 |
+|------|------|------|
+| `/api/servers` | GET | 获取所有服务器列表 |
+| `/api/servers/[id]/metrics` | GET | 获取服务器指标历史 |
+| `/api/agent/report` | POST | Agent 上报指标 |
 
-  return (
-    <form onSubmit={form.handleSubmit(onSubmit)}>
-      <Input {...form.register('username')} />
-      <Input {...form.register('email')} />
-      <Button type="submit">提交</Button>
-    </form>
-  );
+### Agent 上报数据格式
+
+```json
+{
+  "serverId": "my-vps-01",
+  "hostname": "vps-01",
+  "ip": "192.168.1.100",
+  "os": "Ubuntu 22.04 LTS",
+  "kernel": "5.15.0",
+  "cpuModel": "Intel Xeon E5-2686",
+  "cpuCores": 4,
+  "totalMemory": 8589934592,
+  "totalDisk": 107374182400,
+  "agentVersion": "1.0.0",
+  "metrics": {
+    "cpuUsage": 45.2,
+    "memoryUsed": 4294967296,
+    "memoryUsage": 50.0,
+    "diskUsed": 53687091200,
+    "diskUsage": 50.0,
+    "networkRxBytes": 1500000,
+    "networkTxBytes": 800000,
+    "totalRxBytes": 1234567890,
+    "totalTxBytes": 987654321,
+    "loadAvg1": 1.5,
+    "loadAvg5": 1.2,
+    "loadAvg15": 0.8,
+    "uptime": 86400
+  }
 }
 ```
-
-### 6. 数据获取
-
-**服务端组件（推荐）**
-
-```tsx
-// src/app/posts/page.tsx
-async function getPosts() {
-  const res = await fetch('https://api.example.com/posts', {
-    cache: 'no-store', // 或 'force-cache'
-  });
-  return res.json();
-}
-
-export default async function PostsPage() {
-  const posts = await getPosts();
-
-  return (
-    <div>
-      {posts.map(post => (
-        <div key={post.id}>{post.title}</div>
-      ))}
-    </div>
-  );
-}
-```
-
-**客户端组件**
-
-```tsx
-'use client';
-
-import { useEffect, useState } from 'react';
-
-export default function ClientComponent() {
-  const [data, setData] = useState(null);
-
-  useEffect(() => {
-    fetch('/api/data')
-      .then(res => res.json())
-      .then(setData);
-  }, []);
-
-  return <div>{JSON.stringify(data)}</div>;
-}
-```
-
-## 常见开发场景
-
-### 添加新页面
-
-1. 在 `src/app/` 下创建文件夹和 `page.tsx`
-2. 使用 shadcn 组件构建 UI
-3. 根据需要添加 `layout.tsx` 和 `loading.tsx`
-
-### 创建业务组件
-
-1. 在 `src/components/` 下创建组件文件（非 UI 组件）
-2. 优先组合使用 `src/components/ui/` 中的基础组件
-3. 使用 TypeScript 定义 Props 类型
-
-### 添加全局状态
-
-推荐使用 React Context 或 Zustand：
-
-```tsx
-// src/lib/store.ts
-import { create } from 'zustand';
-
-interface Store {
-  count: number;
-  increment: () => void;
-}
-
-export const useStore = create<Store>((set) => ({
-  count: 0,
-  increment: () => set((state) => ({ count: state.count + 1 })),
-}));
-```
-
-### 集成数据库
-
-推荐使用 Prisma 或 Drizzle ORM，在 `src/lib/db.ts` 中配置。
 
 ## 技术栈
 
-- **框架**: Next.js 16.1.1 (App Router)
-- **UI 组件**: shadcn/ui (基于 Radix UI)
-- **样式**: Tailwind CSS v4
-- **表单**: React Hook Form + Zod
-- **图标**: Lucide React
-- **字体**: Geist Sans & Geist Mono
-- **包管理器**: pnpm 9+
-- **TypeScript**: 5.x
+- **前端**: Next.js 16 + React 19 + TypeScript
+- **样式**: Tailwind CSS 4
+- **图表**: Recharts
+- **Agent**: 纯 Node.js，无额外依赖
 
-## 参考文档
+## 系统要求
 
-- [Next.js 官方文档](https://nextjs.org/docs)
-- [shadcn/ui 组件文档](https://ui.shadcn.com)
-- [Tailwind CSS 文档](https://tailwindcss.com/docs)
-- [React Hook Form](https://react-hook-form.com)
+### 监控面板
+- Node.js >= 18
+- 内存 >= 512MB
 
-## 重要提示
+### 被监控端 (Agent)
+- Node.js >= 16
+- 内存 >= 64MB
+- Linux 系统（用于读取 /proc 获取精确数据）
 
-1. **必须使用 pnpm** 作为包管理器
-2. **优先使用 shadcn/ui 组件** 而不是从零开发基础组件
-3. **遵循 Next.js App Router 规范**，正确区分服务端/客户端组件
-4. **使用 TypeScript** 进行类型安全开发
-5. **使用 `@/` 路径别名** 导入模块（已配置）
+## 管理命令
+
+### 监控面板
+
+```bash
+systemctl status vps-monitor   # 查看状态
+systemctl restart vps-monitor  # 重启服务
+journalctl -u vps-monitor -f   # 查看日志
+systemctl stop vps-monitor     # 停止服务
+```
+
+### 监控 Agent
+
+```bash
+systemctl status vps-agent     # 查看状态
+systemctl restart vps-agent    # 重启服务
+journalctl -u vps-agent -f     # 查看日志
+systemctl stop vps-agent       # 停止服务
+```
+
+## 开发
+
+```bash
+# 安装依赖
+pnpm install
+
+# 启动开发环境
+pnpm run dev
+
+# 构建生产版本
+pnpm run build
+
+# 启动生产环境
+pnpm run start
+
+# 类型检查
+pnpm ts-check
+
+# 代码检查
+pnpm lint
+```
+
+## 目录结构
+
+```
+├── src/
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── agent/report/route.ts   # Agent 上报接口
+│   │   │   └── servers/
+│   │   │       ├── route.ts            # 服务器列表接口
+│   │   │       └── [id]/metrics/route.ts # 指标历史接口
+│   │   ├── layout.tsx
+│   │   ├── page.tsx
+│   │   └── globals.css
+│   ├── components/
+│   │   └── dashboard/
+│   │       ├── server-card.tsx
+│   │       ├── server-detail.tsx
+│   │       ├── metrics-chart.tsx
+│   │       └── status-indicator.tsx
+│   └── lib/
+│       ├── store.ts
+│       └── utils.ts
+├── public/
+│   └── agent/
+│       └── vps-monitor.js              # Agent 脚本
+├── deploy-server.sh                    # 面板一键部署脚本
+├── deploy-agent.sh                     # Agent 一键部署脚本
+└── package.json
+```
+
+## License
+
+MIT
