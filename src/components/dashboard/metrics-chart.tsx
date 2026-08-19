@@ -29,7 +29,7 @@ interface MetricsChartProps {
 
 function formatTime(timestamp: number): string {
   const date = new Date(timestamp);
-  return date.toLocaleTimeString('en-US', {
+  return date.toLocaleTimeString('zh-CN', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
@@ -84,9 +84,7 @@ export function MetricsChart({
 }: MetricsChartProps) {
   const chartData = data.map((d) => ({
     timestamp: d.timestamp,
-    [dataKey]: unit === 'bytes/s'
-      ? (d as Record<string, number>)[dataKey]
-      : (d as Record<string, number>)[dataKey],
+    [dataKey]: (d as Record<string, number>)[dataKey],
   }));
 
   const maxDomain = unit === '%' ? 100 : undefined;
@@ -101,7 +99,7 @@ export function MetricsChart({
           <AreaChart data={chartData}>
             <defs>
               <linearGradient id={`gradient-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={color} stopOpacity={0.3} />
+                <stop offset="5%" stopColor={color} stopOpacity={0.2} />
                 <stop offset="95%" stopColor={color} stopOpacity={0} />
               </linearGradient>
             </defs>
@@ -201,17 +199,17 @@ export function NetworkChart({ data }: NetworkChartProps) {
   return (
     <div className="bg-[var(--card)] border border-[var(--border)] rounded-lg p-4">
       <h3 className="text-sm font-semibold text-[var(--foreground)] mb-4">
-        Network I/O
+        网络流量
       </h3>
       <ResponsiveContainer width="100%" height={200}>
         <AreaChart data={chartData}>
           <defs>
             <linearGradient id="gradient-rx" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
+              <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.2} />
+              <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0} />
             </linearGradient>
             <linearGradient id="gradient-tx" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
+              <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2} />
               <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
             </linearGradient>
           </defs>
@@ -246,7 +244,7 @@ export function NetworkChart({ data }: NetworkChartProps) {
           <Area
             type="monotone"
             dataKey="rx"
-            stroke="#06b6d4"
+            stroke="#0ea5e9"
             strokeWidth={2}
             fill="url(#gradient-rx)"
             isAnimationActive={false}
@@ -263,12 +261,12 @@ export function NetworkChart({ data }: NetworkChartProps) {
       </ResponsiveContainer>
       <div className="flex gap-4 mt-2 justify-center">
         <div className="flex items-center gap-2">
-          <span className="w-3 h-0.5 bg-[#06b6d4] rounded" />
-          <span className="text-xs text-[var(--muted-foreground)]">RX (Download)</span>
+          <span className="w-3 h-0.5 bg-[#0ea5e9] rounded" />
+          <span className="text-xs text-[var(--muted-foreground)]">下载</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="w-3 h-0.5 bg-[#8b5cf6] rounded" />
-          <span className="text-xs text-[var(--muted-foreground)]">TX (Upload)</span>
+          <span className="text-xs text-[var(--muted-foreground)]">上传</span>
         </div>
       </div>
     </div>

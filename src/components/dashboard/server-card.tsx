@@ -22,16 +22,11 @@ interface ServerCardProps {
   onClick: () => void;
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
-}
-
-function formatSpeed(bytesPerSec: number): string {
-  return `${formatBytes(bytesPerSec)}/s`;
+function formatKB(bytesPerSec: number): string {
+  const kb = bytesPerSec / 1024;
+  if (kb < 1) return `${(bytesPerSec).toFixed(0)} B`;
+  if (kb >= 1024) return `${(kb / 1024).toFixed(1)} MB`;
+  return `${kb.toFixed(1)} KB`;
 }
 
 function getUsageColor(usage: number): string {
@@ -50,21 +45,18 @@ function getUsageBgColor(usage: number): string {
 
 function timeAgo(timestamp: number): string {
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 60) return `${seconds}秒前`;
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 60) return `${minutes}分钟前`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return `${hours}小时前`;
   const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  return `${days}天前`;
 }
 
 export function ServerCard({
   hostname,
   ip,
-  os,
-  cpuCores,
-  totalMemory,
   online,
   lastSeen,
   latest,
@@ -75,8 +67,8 @@ export function ServerCard({
       onClick={onClick}
       className="card-hover bg-[var(--card)] border border-[var(--border)] rounded-lg p-5 cursor-pointer transition-all duration-200"
     >
-      {/* Header */}
-      <div className="flex items-start justify-between mb-4">
+      {/* Header: 名称 + 状态 */}
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <StatusIndicator online={online} />
           <div>
@@ -88,16 +80,13 @@ export function ServerCard({
             </p>
           </div>
         </div>
-        <span className="text-xs text-[var(--muted-foreground)]">
-          {online ? 'Online' : timeAgo(lastSeen)}
+        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+          online
+            ? 'bg-green-50 text-[var(--status-online)]'
+            : 'bg-red-50 text-[var(--status-offline)]'
+        }`}>
+          {online ? '在线' : '离线'}
         </span>
-      </div>
-
-      {/* System Info */}
-      <div className="flex gap-4 mb-4 text-xs text-[var(--muted-foreground)]">
-        <span>{os}</span>
-        <span>{cpuCores} cores</span>
-        <span>{formatBytes(totalMemory)}</span>
       </div>
 
       {/* Metrics */}
@@ -105,7 +94,7 @@ export function ServerCard({
         <div className="space-y-3">
           {/* CPU */}
           <div>
-            <div className="flex justify-between items-center mb-1">
+            <div className="flex justify-between items-center mb-1.5">
               <span className="text-xs text-[var(--muted-foreground)]">CPU</span>
               <span className={`metric-value text-sm ${getUsageColor(latest.cpuUsage)}`}>
                 {latest.cpuUsage.toFixed(1)}
@@ -122,8 +111,8 @@ export function ServerCard({
 
           {/* Memory */}
           <div>
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-xs text-[var(--muted-foreground)]">Memory</span>
+            <div className="flex justify-between items-center mb-1.5">
+              <span className="text-xs text-[var(--muted-foreground)]">内存</span>
               <span className={`metric-value text-sm ${getUsageColor(latest.memoryUsage)}`}>
                 {latest.memoryUsage.toFixed(1)}
                 <span className="metric-unit">%</span>
@@ -138,30 +127,24 @@ export function ServerCard({
           </div>
 
           {/* Network */}
-          <div className="flex gap-4 pt-2 border-t border-[var(--border)]">
+          <div className="flex gap-4 pt-3 border-t border-[var(--border)]">
             <div className="flex-1">
-              <span className="text-xs text-[var(--muted-foreground)]">↓ RX</span>
-              <p className="metric-value text-xs text-[var(--chart-1)]">
-                {formatSpeed(latest.networkRxBytes)}
+              <span className="text-xs text-[var(--muted-foreground)]">上传</span>
+              <p className="metric-value text-sm text-[var(--chart-4)]">
+                {formatKB(latest.networkTxBytes)}
               </p>
             </div>
             <div className="flex-1">
-              <span className="text-xs text-[var(--muted-foreground)]">↑ TX</span>
-              <p className="metric-value text-xs text-[var(--chart-4)]">
-                {formatSpeed(latest.networkTxBytes)}
-              </p>
-            </div>
-            <div className="flex-1">
-              <span className="text-xs text-[var(--muted-foreground)]">Load</span>
-              <p className="metric-value text-xs text-[var(--foreground)]">
-                {latest.loadAvg1.toFixed(2)}
+              <span className="text-xs text-[var(--muted-foreground)]">下载</span>
+              <p className="metric-value text-sm text-[var(--chart-1)]">
+                {formatKB(latest.networkRxBytes)}
               </p>
             </div>
           </div>
         </div>
       ) : (
         <div className="text-center py-4 text-sm text-[var(--muted-foreground)]">
-          No metrics available
+          {online ? '暂无数据' : `最后上报: ${timeAgo(lastSeen)}`}
         </div>
       )}
     </div>

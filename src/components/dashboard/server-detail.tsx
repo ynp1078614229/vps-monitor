@@ -53,9 +53,9 @@ function formatUptime(seconds: number): string {
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
   const mins = Math.floor((seconds % 3600) / 60);
-  if (days > 0) return `${days}d ${hours}h ${mins}m`;
-  if (hours > 0) return `${hours}h ${mins}m`;
-  return `${mins}m`;
+  if (days > 0) return `${days}天${hours}小时${mins}分`;
+  if (hours > 0) return `${hours}小时${mins}分`;
+  return `${mins}分钟`;
 }
 
 export function ServerDetail({ serverId, onBack }: ServerDetailProps) {
@@ -86,7 +86,7 @@ export function ServerDetail({ serverId, onBack }: ServerDetailProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-[var(--muted-foreground)]">Loading...</div>
+        <div className="text-[var(--muted-foreground)]">加载中...</div>
       </div>
     );
   }
@@ -94,7 +94,7 @@ export function ServerDetail({ serverId, onBack }: ServerDetailProps) {
   if (!server) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-[var(--muted-foreground)]">Server not found</div>
+        <div className="text-[var(--muted-foreground)]">未找到服务器</div>
       </div>
     );
   }
@@ -110,7 +110,7 @@ export function ServerDetail({ serverId, onBack }: ServerDetailProps) {
           className="flex items-center gap-2 px-3 py-1.5 text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)] bg-[var(--card)] border border-[var(--border)] rounded-lg transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back
+          返回
         </button>
         <div className="flex items-center gap-3">
           <StatusIndicator online={server.online} size="lg" />
@@ -127,23 +127,23 @@ export function ServerDetail({ serverId, onBack }: ServerDetailProps) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <InfoCard
           icon={<Server className="w-4 h-4 text-[var(--chart-1)]" />}
-          label="OS"
+          label="操作系统"
           value={server.os}
         />
         <InfoCard
           icon={<Cpu className="w-4 h-4 text-[var(--chart-2)]" />}
-          label="CPU"
-          value={`${server.cpuCores} cores`}
+          label="处理器"
+          value={`${server.cpuCores} 核心`}
           sub={server.cpuModel}
         />
         <InfoCard
           icon={<MemoryStick className="w-4 h-4 text-[var(--chart-4)]" />}
-          label="Memory"
+          label="内存"
           value={formatBytes(server.totalMemory)}
         />
         <InfoCard
           icon={<HardDrive className="w-4 h-4 text-[var(--chart-3)]" />}
-          label="Disk"
+          label="磁盘"
           value={formatBytes(server.totalDisk)}
         />
       </div>
@@ -152,27 +152,27 @@ export function ServerDetail({ serverId, onBack }: ServerDetailProps) {
       {latest && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <MetricBox
-            label="CPU Usage"
+            label="CPU 使用率"
             value={`${latest.cpuUsage.toFixed(1)}%`}
             color={getUsageColorVar(latest.cpuUsage)}
           />
           <MetricBox
-            label="Memory"
+            label="内存使用率"
             value={`${latest.memoryUsage.toFixed(1)}%`}
             color={getUsageColorVar(latest.memoryUsage)}
           />
           <MetricBox
-            label="Disk"
+            label="磁盘使用率"
             value={`${latest.diskUsage.toFixed(1)}%`}
             color={getUsageColorVar(latest.diskUsage)}
           />
           <MetricBox
-            label="Load Avg"
+            label="系统负载"
             value={latest.loadAvg1.toFixed(2)}
-            sub={`5m: ${latest.loadAvg5.toFixed(2)} / 15m: ${latest.loadAvg15.toFixed(2)}`}
+            sub={`5分: ${latest.loadAvg5.toFixed(2)} / 15分: ${latest.loadAvg15.toFixed(2)}`}
           />
           <MetricBox
-            label="Uptime"
+            label="运行时间"
             value={formatUptime(latest.uptime)}
             icon={<Clock className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />}
           />
@@ -183,14 +183,14 @@ export function ServerDetail({ serverId, onBack }: ServerDetailProps) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <MetricsChart
           data={metrics}
-          title="CPU Usage"
+          title="CPU 使用率"
           dataKey="cpuUsage"
-          color="#06b6d4"
+          color="#0ea5e9"
           unit="%"
         />
         <MetricsChart
           data={metrics}
-          title="Memory Usage"
+          title="内存使用率"
           dataKey="memoryUsage"
           color="#8b5cf6"
           unit="%"
