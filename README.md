@@ -35,13 +35,13 @@
 在中央服务器上运行：
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/YOUR_USERNAME/vps-monitor/main/deploy-server.sh | bash
+curl -sSL https://raw.githubusercontent.com/ynp1078614229/vps-monitor/main/deploy-server.sh | bash
 ```
 
 或手动部署：
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/vps-monitor.git
+git clone https://github.com/ynp1078614229/vps-monitor.git
 cd vps-monitor
 pnpm install
 pnpm run build
@@ -53,7 +53,7 @@ PORT=8080 pnpm run start
 在被监控的 VPS 上运行：
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/YOUR_USERNAME/vps-monitor/main/deploy-agent.sh | bash -s -- \
+curl -sSL https://raw.githubusercontent.com/ynp1078614229/vps-monitor/main/deploy-agent.sh | bash -s -- \
   --server http://your-monitor-server:8080 \
   --secret vps-monitor-default-secret
 ```

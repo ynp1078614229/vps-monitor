@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # VPS 监控 Agent - 一键部署脚本
-# 用法: curl -sSL https://raw.githubusercontent.com/YOUR_USERNAME/vps-monitor/main/deploy-agent.sh | bash -s -- --server http://your-server:8080 --secret your-secret
+# 用法: curl -sSL https://raw.githubusercontent.com/ynp1078614229/vps-monitor/main/deploy-agent.sh | bash -s -- --server http://your-server:8080 --secret your-secret
 # 或: bash deploy-agent.sh --server http://your-server:8080 --secret your-secret
 #
 
@@ -162,7 +162,7 @@ download_agent() {
     
     if [ ! -f "$INSTALL_DIR/vps-monitor.js" ]; then
         # 从 GitHub 下载
-        curl -sSL -o "$INSTALL_DIR/vps-monitor.js" "https://raw.githubusercontent.com/YOUR_USERNAME/vps-monitor/main/public/agent/vps-monitor.js"
+        curl -sSL -o "$INSTALL_DIR/vps-monitor.js" "https://raw.githubusercontent.com/ynp1078614229/vps-monitor/main/public/agent/vps-monitor.js"
     fi
     
     if [ -f "$INSTALL_DIR/vps-monitor.js" ]; then

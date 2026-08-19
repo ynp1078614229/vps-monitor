@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # VPS 监控面板 - 一键部署脚本
-# 用法: curl -sSL https://raw.githubusercontent.com/YOUR_USERNAME/vps-monitor/main/deploy-server.sh | bash
+# 用法: curl -sSL https://raw.githubusercontent.com/ynp1078614229/vps-monitor/main/deploy-server.sh | bash
 # 或: bash deploy-server.sh
 #
 
@@ -109,7 +109,7 @@ download_project() {
     mkdir -p "$INSTALL_DIR"
     
     # 从 GitHub 下载
-    curl -sSL "https://github.com/YOUR_USERNAME/vps-monitor/archive/refs/heads/main.tar.gz" | tar -xz -C "$INSTALL_DIR" --strip-components=1
+    curl -sSL "https://github.com/ynp1078614229/vps-monitor/archive/refs/heads/main.tar.gz" | tar -xz -C "$INSTALL_DIR" --strip-components=1
     
     success "项目下载完成"
 }
