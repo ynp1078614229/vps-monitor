@@ -1,10 +1,8 @@
-import { NextResponse } from 'next/server';
-import { getAllServers, isServerOnline, seedDemoData } from '@/lib/store';
+import { NextRequest, NextResponse } from 'next/server';
+import { getAllServers, isServerOnline, upsertServer } from '@/lib/store';
 
 export async function GET() {
   try {
-    seedDemoData();
-
     const servers = getAllServers().map((data) => ({
       id: data.info.id,
       hostname: data.info.hostname,
@@ -30,6 +28,62 @@ export async function GET() {
     return NextResponse.json({ servers });
   } catch (error) {
     console.error('List servers error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { id, hostname, ip } = body;
+
+    if (!id || !ip) {
+      return NextResponse.json(
+        { error: '缺少必填字段: id, ip' },
+        { status: 400 }
+      );
+    }
+
+    // Create a placeholder server entry
+    upsertServer(
+      {
+        id,
+        hostname: hostname || id,
+        ip,
+        os: '未知',
+        kernel: '未知',
+        cpuModel: '未知',
+        cpuCores: 0,
+        totalMemory: 0,
+        totalDisk: 0,
+        agentVersion: '未连接',
+        firstSeen: Date.now(),
+        lastSeen: Date.now(),
+      },
+      {
+        timestamp: Date.now(),
+        cpuUsage: 0,
+        memoryUsed: 0,
+        memoryUsage: 0,
+        diskUsed: 0,
+        diskUsage: 0,
+        networkRxBytes: 0,
+        networkTxBytes: 0,
+        totalRxBytes: 0,
+        totalTxBytes: 0,
+        loadAvg1: 0,
+        loadAvg5: 0,
+        loadAvg15: 0,
+        uptime: 0,
+      }
+    );
+
+    return NextResponse.json({ success: true, message: '服务器已添加' });
+  } catch (error) {
+    console.error('Add server error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

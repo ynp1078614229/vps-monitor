@@ -1,6 +1,7 @@
 'use client';
 
 import { StatusIndicator } from './status-indicator';
+import { Trash2 } from 'lucide-react';
 
 interface ServerCardProps {
   id: string;
@@ -22,6 +23,7 @@ interface ServerCardProps {
     loadAvg1: number;
   } | null;
   onClick: () => void;
+  onDelete: () => void;
 }
 
 function formatKB(bytesPerSec: number): string {
@@ -71,12 +73,24 @@ export function ServerCard({
   lastSeen,
   latest,
   onClick,
+  onDelete,
 }: ServerCardProps) {
   return (
     <div
       onClick={onClick}
-      className="card-hover bg-[var(--card)] border border-[var(--border)] rounded-lg p-5 cursor-pointer transition-all duration-200"
+      className="card-hover bg-[var(--card)] border border-[var(--border)] rounded-lg p-5 cursor-pointer transition-all duration-200 relative group"
     >
+      {/* Delete button */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete();
+        }}
+        className="absolute top-3 right-3 p-1.5 text-[var(--muted-foreground)] hover:text-[var(--status-offline)] opacity-0 group-hover:opacity-100 transition-opacity"
+        title="删除服务器"
+      >
+        <Trash2 className="w-4 h-4" />
+      </button>
       {/* Header: 名称 + 状态 */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">

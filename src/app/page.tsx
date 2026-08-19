@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ServerCard } from '@/components/dashboard/server-card';
 import { ServerDetail } from '@/components/dashboard/server-detail';
-import { Activity, Server as ServerIcon, RefreshCw } from 'lucide-react';
+import { Activity, Server as ServerIcon, RefreshCw, Plus, X } from 'lucide-react';
 
 interface ServerData {
   id: string;
@@ -31,6 +31,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [selectedServer, setSelectedServer] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   const fetchServers = useCallback(async () => {
     try {
@@ -45,6 +46,18 @@ export default function DashboardPage() {
       setLoading(false);
     }
   }, []);
+
+  const handleDeleteServer = async (serverId: string) => {
+    if (!confirm('确定要删除此服务器吗？所有监控数据将被清除。')) return;
+    try {
+      const res = await fetch(`/api/servers/${serverId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setServers((prev) => prev.filter((s) => s.id !== serverId));
+      }
+    } catch (err) {
+      console.error('Delete server error:', err);
+    }
+  };
 
   useEffect(() => {
     fetchServers();
@@ -63,6 +76,10 @@ export default function DashboardPage() {
           <ServerDetail
             serverId={selectedServer}
             onBack={() => setSelectedServer(null)}
+            onDelete={() => {
+              handleDeleteServer(selectedServer);
+              setSelectedServer(null);
+            }}
           />
         </div>
       </div>
@@ -114,6 +131,15 @@ export default function DashboardPage() {
               )}
             </div>
 
+            {/* Add button */}
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm text-white bg-[var(--primary)] rounded-lg hover:opacity-90 transition-opacity"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">添加</span>
+            </button>
+
             {/* Refresh button */}
             <button
               onClick={fetchServers}
@@ -147,9 +173,16 @@ export default function DashboardPage() {
               <p className="text-[var(--foreground)] font-medium mb-1">
                 暂无监控服务器
               </p>
-              <p className="text-sm text-[var(--muted-foreground)]">
-                在 VPS 上部署监控 Agent 开始采集数据
+              <p className="text-sm text-[var(--muted-foreground)] mb-4">
+                点击「添加」按钮或部署 Agent 开始采集数据
               </p>
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm text-white bg-[var(--primary)] rounded-lg hover:opacity-90 transition-opacity"
+              >
+                <Plus className="w-4 h-4" />
+                添加服务器
+              </button>
             </div>
           </div>
         ) : (
@@ -167,6 +200,7 @@ export default function DashboardPage() {
                 lastSeen={server.lastSeen}
                 latest={server.latest}
                 onClick={() => setSelectedServer(server.id)}
+                onDelete={() => handleDeleteServer(server.id)}
               />
             ))}
           </div>
@@ -186,6 +220,111 @@ curl -o vps-monitor.js <your-server-url>/agent/vps-monitor.js
 AGENT_SECRET="your-secret" SERVER_URL="<your-server-url>" node vps-monitor.js`}</pre>
           </div>
         </div>
+      </div>
+
+      {/* Add Server Modal */}
+      {showAddModal && (
+        <AddServerModal onClose={() => setShowAddModal(false)} onAdded={fetchServers} />
+      )}
+    </div>
+  );
+}
+
+function AddServerModal({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
+  const [serverId, setServerId] = useState('');
+  const [hostname, setHostname] = useState('');
+  const [ip, setIp] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!serverId || !ip) return;
+
+    try {
+      const res = await fetch('/api/servers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: serverId,
+          hostname: hostname || serverId,
+          ip,
+        }),
+      });
+      if (res.ok) {
+        onAdded();
+        onClose();
+      }
+    } catch (err) {
+      console.error('Add server error:', err);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="w-full max-w-md bg-[var(--card)] border border-[var(--border)] rounded-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-[var(--foreground)]">添加服务器</h2>
+          <button
+            onClick={onClose}
+            className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm text-[var(--muted-foreground)] mb-1">
+              服务器 ID *
+            </label>
+            <input
+              type="text"
+              value={serverId}
+              onChange={(e) => setServerId(e.target.value)}
+              placeholder="例如: vps-01"
+              className="w-full px-3 py-2 text-sm bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-[var(--primary)]"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-[var(--muted-foreground)] mb-1">
+              主机名
+            </label>
+            <input
+              type="text"
+              value={hostname}
+              onChange={(e) => setHostname(e.target.value)}
+              placeholder="例如: my-vps"
+              className="w-full px-3 py-2 text-sm bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-[var(--primary)]"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-[var(--muted-foreground)] mb-1">
+              IP 地址 *
+            </label>
+            <input
+              type="text"
+              value={ip}
+              onChange={(e) => setIp(e.target.value)}
+              placeholder="例如: 192.168.1.100"
+              className="w-full px-3 py-2 text-sm bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-[var(--primary)]"
+              required
+            />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 text-sm text-[var(--muted-foreground)] bg-[var(--background)] border border-[var(--border)] rounded-lg hover:bg-[var(--muted)] transition-colors"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              className="flex-1 px-4 py-2 text-sm text-white bg-[var(--primary)] rounded-lg hover:opacity-90 transition-opacity"
+            >
+              添加
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

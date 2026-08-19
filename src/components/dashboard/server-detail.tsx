@@ -3,11 +3,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { MetricsChart, NetworkChart } from './metrics-chart';
 import { StatusIndicator } from './status-indicator';
-import { ArrowLeft, Cpu, HardDrive, MemoryStick, Clock, Server } from 'lucide-react';
+import { ArrowLeft, Cpu, HardDrive, MemoryStick, Clock, Server, Trash2 } from 'lucide-react';
 
 interface ServerDetailProps {
   serverId: string;
   onBack: () => void;
+  onDelete: () => void;
 }
 
 interface ServerInfo {
@@ -58,7 +59,7 @@ function formatUptime(seconds: number): string {
   return `${mins}分钟`;
 }
 
-export function ServerDetail({ serverId, onBack }: ServerDetailProps) {
+export function ServerDetail({ serverId, onBack, onDelete }: ServerDetailProps) {
   const [server, setServer] = useState<ServerInfo | null>(null);
   const [metrics, setMetrics] = useState<MetricsRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,23 +105,32 @@ export function ServerDetail({ serverId, onBack }: ServerDetailProps) {
   return (
     <div className="space-y-6">
       {/* Back button + Header */}
-      <div className="flex items-center gap-4">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 px-3 py-1.5 text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)] bg-[var(--card)] border border-[var(--border)] rounded-lg transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          返回
-        </button>
-        <div className="flex items-center gap-3">
-          <StatusIndicator online={server.online} size="lg" />
-          <div>
-            <h2 className="text-lg font-semibold">{server.hostname}</h2>
-            <p className="text-xs text-[var(--muted-foreground)] font-mono">
-              {server.ip}
-            </p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)] bg-[var(--card)] border border-[var(--border)] rounded-lg transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            返回
+          </button>
+          <div className="flex items-center gap-3">
+            <StatusIndicator online={server.online} size="lg" />
+            <div>
+              <h2 className="text-lg font-semibold">{server.hostname}</h2>
+              <p className="text-xs text-[var(--muted-foreground)] font-mono">
+                {server.ip}
+              </p>
+            </div>
           </div>
         </div>
+        <button
+          onClick={onDelete}
+          className="flex items-center gap-2 px-3 py-1.5 text-sm text-[var(--status-offline)] hover:bg-red-50 border border-[var(--border)] rounded-lg transition-colors"
+        >
+          <Trash2 className="w-4 h-4" />
+          删除
+        </button>
       </div>
 
       {/* System Info Cards */}
