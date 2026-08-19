@@ -1,7 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { StatusIndicator } from './status-indicator';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Pencil, Check, X } from 'lucide-react';
 
 interface ServerCardProps {
   id: string;
@@ -25,6 +26,7 @@ interface ServerCardProps {
   } | null;
   onClick: () => void;
   onDelete: () => void;
+  onRemarkUpdate?: (id: string, remark: string) => void;
 }
 
 function formatKB(bytesPerSec: number): string {
@@ -68,6 +70,7 @@ function timeAgo(timestamp: number): string {
 }
 
 export function ServerCard({
+  id,
   hostname,
   ip,
   online,
@@ -76,7 +79,23 @@ export function ServerCard({
   latest,
   onClick,
   onDelete,
+  onRemarkUpdate,
 }: ServerCardProps) {
+  const [isEditingRemark, setIsEditingRemark] = useState(false);
+  const [editRemarkValue, setEditRemarkValue] = useState(remark || '');
+
+  const handleSaveRemark = () => {
+    if (onRemarkUpdate) {
+      onRemarkUpdate(id, editRemarkValue);
+    }
+    setIsEditingRemark(false);
+  };
+
+  const handleCancelEdit = () => {
+    setEditRemarkValue(remark || '');
+    setIsEditingRemark(false);
+  };
+
   return (
     <div
       onClick={onClick}
@@ -95,19 +114,64 @@ export function ServerCard({
       </button>
       {/* Header: 名称 + 状态 */}
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
           <StatusIndicator online={online} />
-          <div>
+          <div className="flex-1 min-w-0">
             <h3 className="text-sm font-semibold text-[var(--foreground)]">
               {hostname}
             </h3>
             <p className="text-xs text-[var(--muted-foreground)] font-mono">
               {ip}
             </p>
-            {remark && (
-              <p className="text-xs text-[var(--muted-foreground)] mt-0.5 italic">
-                {remark}
-              </p>
+            {/* 备注显示/编辑 */}
+            {isEditingRemark ? (
+              <div className="flex items-center gap-1 mt-1" onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="text"
+                  value={editRemarkValue}
+                  onChange={(e) => setEditRemarkValue(e.target.value)}
+                  className="text-xs border border-[var(--border)] rounded px-1.5 py-0.5 flex-1 min-w-0 bg-[var(--card)] text-[var(--foreground)]"
+                  placeholder="输入备注..."
+                  autoFocus
+                />
+                <button
+                  onClick={handleSaveRemark}
+                  className="p-0.5 text-[var(--status-online)] hover:text-green-600"
+                  title="保存"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={handleCancelEdit}
+                  className="p-0.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                  title="取消"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 mt-0.5">
+                {remark ? (
+                  <p className="text-xs text-[var(--muted-foreground)] italic truncate">
+                    {remark}
+                  </p>
+                ) : (
+                  <p className="text-xs text-[var(--muted-foreground)]/50 italic">
+                    点击添加备注
+                  </p>
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditRemarkValue(remark || '');
+                    setIsEditingRemark(true);
+                  }}
+                  className="p-0.5 text-[var(--muted-foreground)] hover:text-[var(--primary)] opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="编辑备注"
+                >
+                  <Pencil className="w-3 h-3" />
+                </button>
+              </div>
             )}
           </div>
         </div>

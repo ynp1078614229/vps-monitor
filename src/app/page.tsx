@@ -60,6 +60,21 @@ export default function DashboardPage() {
     }
   };
 
+  const handleUpdateRemark = async (serverId: string, remark: string) => {
+    try {
+      await fetch('/api/servers', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: serverId, remark }),
+      });
+      setServers((prev) =>
+        prev.map((s) => (s.id === serverId ? { ...s, remark } : s))
+      );
+    } catch (err) {
+      console.error('Update remark error:', err);
+    }
+  };
+
   useEffect(() => {
     fetchServers();
     const interval = setInterval(fetchServers, 5_000);
@@ -203,6 +218,7 @@ export default function DashboardPage() {
                 latest={server.latest}
                 onClick={() => setSelectedServer(server.id)}
                 onDelete={() => handleDeleteServer(server.id)}
+                onRemarkUpdate={handleUpdateRemark}
               />
             ))}
           </div>
