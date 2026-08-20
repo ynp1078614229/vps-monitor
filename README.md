@@ -48,7 +48,7 @@ git clone https://github.com/ynp1078614229/vps-monitor.git
 cd vps-monitor
 pnpm install
 pnpm run build
-PORT=8080 pnpm run start
+PORT=80 pnpm run start
 ```
 
 ### 2. 部署监控 Agent
@@ -57,7 +57,7 @@ PORT=8080 pnpm run start
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/ynp1078614229/vps-monitor/main/deploy-agent.sh | bash -s -- \
-  --server http://your-monitor-server:8080 \
+  --server http://your-monitor-server:80 \
   --secret vps-monitor-default-secret
 ```
 
@@ -82,7 +82,7 @@ PORT=3000 AGENT_SECRET=my-secret bash deploy-server.sh
 ### 被监控端
 
 ```bash
-bash deploy-agent.sh --server http://monitor:8080 --secret my-secret --id my-vps-01
+bash deploy-agent.sh --server http://monitor:80 --secret my-secret --id my-vps-01
 ```
 
 ## API 接口

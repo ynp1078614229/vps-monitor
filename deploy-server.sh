@@ -98,18 +98,25 @@ install_pnpm() {
     success "pnpm 安装完成: $(pnpm --version)"
 }
 
-# 下载项目
+# 下载项目（预构建版本）
 download_project() {
     if [ -d "$INSTALL_DIR" ]; then
         warn "目录 $INSTALL_DIR 已存在，备份为 ${INSTALL_DIR}.bak"
         mv "$INSTALL_DIR" "${INSTALL_DIR}.bak"
     fi
 
-    info "正在下载项目..."
+    info "正在下载预构建版本..."
     mkdir -p "$INSTALL_DIR"
     
-    # 从 GitHub 下载
-    curl -sSL "https://github.com/ynp1078614229/vps-monitor/archive/refs/heads/main.tar.gz" | tar -xz -C "$INSTALL_DIR" --strip-components=1
+    # 从 GitHub 下载预构建版本（包含 .next 目录）
+    if ! curl -sSL "https://github.com/ynp1078614229/vps-monitor/releases/latest/download/vps-monitor.tar.gz" | tar -xz -C "$INSTALL_DIR" 2>/dev/null; then
+        warn "预构建版本下载失败，尝试从源码构建..."
+        # 回退到源码构建
+        curl -sSL "https://github.com/ynp1078614229/vps-monitor/archive/refs/heads/main.tar.gz" | tar -xz -C "$INSTALL_DIR" --strip-components=1
+        NEED_BUILD=true
+    else
+        NEED_BUILD=false
+    fi
     
     success "项目下载完成"
 }
@@ -133,12 +140,16 @@ install_deps() {
     success "依赖安装完成"
 }
 
-# 构建项目
+# 构建项目（仅在需要时）
 build_project() {
-    info "正在构建项目..."
-    cd "$INSTALL_DIR"
-    pnpm run build
-    success "构建完成"
+    if [ "$NEED_BUILD" = true ]; then
+        info "正在构建项目..."
+        cd "$INSTALL_DIR"
+        pnpm run build
+        success "构建完成"
+    else
+        info "使用预构建版本，跳过构建步骤"
+    fi
 }
 
 # 创建 systemd 服务
