@@ -255,6 +255,7 @@ function AddServerModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
   const [sshPort, setSshPort] = useState('22');
   const [sshUser, setSshUser] = useState('root');
   const [sshPassword, setSshPassword] = useState('');
+  const [monitorUrl, setMonitorUrl] = useState('');
   // Manual fields
   const [serverId, setServerId] = useState('');
   const [hostname, setHostname] = useState('');
@@ -265,6 +266,18 @@ function AddServerModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
   const [deployLogs, setDeployLogs] = useState<string[]>([]);
   const [deployDone, setDeployDone] = useState(false);
   const [deploySuccess, setDeploySuccess] = useState(false);
+
+  // 获取当前服务器公网 IP 作为默认监控地址
+  useEffect(() => {
+    fetch('/api/server-info')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.monitorUrl && !monitorUrl) {
+          setMonitorUrl(data.monitorUrl);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleAutoDeploy = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -283,6 +296,10 @@ function AddServerModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
           port: parseInt(sshPort) || 22,
           username: sshUser,
           password: sshPassword,
+          serverId: serverId || undefined,
+          hostname: hostname || undefined,
+          secret: 'vps-monitor-default-secret',
+          monitorUrl: monitorUrl || undefined,
         }),
       });
       const data = await res.json();
@@ -428,6 +445,22 @@ function AddServerModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
                     required
                     disabled={deploying}
                   />
+                </div>
+                <div>
+                  <label className="block text-sm text-[var(--muted-foreground)] mb-1">
+                    监控面板地址
+                  </label>
+                  <input
+                    type="text"
+                    value={monitorUrl}
+                    onChange={(e) => setMonitorUrl(e.target.value)}
+                    placeholder="例如: http://103.6.235.231:8080"
+                    className="w-full px-3 py-2 text-sm bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-[var(--primary)]"
+                    disabled={deploying}
+                  />
+                  <p className="text-xs text-[var(--muted-foreground)] mt-1">
+                    Agent 部署后上报数据的目标地址，默认为当前服务器
+                  </p>
                 </div>
                 <div className="flex gap-3 pt-2">
                   <button
