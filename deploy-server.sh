@@ -17,7 +17,7 @@ NC='\033[0m'
 # 配置
 INSTALL_DIR="/opt/vps-monitor"
 SERVICE_NAME="vps-monitor"
-PORT="${PORT:-8080}"
+PORT="${PORT:-80}"
 AGENT_SECRET="${AGENT_SECRET:-vps-monitor-default-secret}"
 
 # 打印信息
