@@ -249,12 +249,60 @@ AGENT_SECRET="your-secret" SERVER_URL="<your-server-url>" node vps-monitor.js`}<
 }
 
 function AddServerModal({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
+  const [mode, setMode] = useState<'auto' | 'manual'>('auto');
+  // Auto deploy fields
+  const [sshIp, setSshIp] = useState('');
+  const [sshPort, setSshPort] = useState('22');
+  const [sshUser, setSshUser] = useState('root');
+  const [sshPassword, setSshPassword] = useState('');
+  // Manual fields
   const [serverId, setServerId] = useState('');
   const [hostname, setHostname] = useState('');
   const [ip, setIp] = useState('');
   const [remark, setRemark] = useState('');
+  // Deploy state
+  const [deploying, setDeploying] = useState(false);
+  const [deployLogs, setDeployLogs] = useState<string[]>([]);
+  const [deployDone, setDeployDone] = useState(false);
+  const [deploySuccess, setDeploySuccess] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleAutoDeploy = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!sshIp || !sshUser || !sshPassword) return;
+
+    setDeploying(true);
+    setDeployLogs(['[INFO] 开始连接...']);
+    setDeployDone(false);
+
+    try {
+      const res = await fetch('/api/deploy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ip: sshIp,
+          port: parseInt(sshPort) || 22,
+          username: sshUser,
+          password: sshPassword,
+        }),
+      });
+      const data = await res.json();
+      setDeployLogs(data.logs || []);
+      setDeployDone(true);
+      setDeploySuccess(data.success);
+
+      if (data.success) {
+        onAdded();
+      }
+    } catch (err) {
+      setDeployLogs((prev) => [...prev, `[ERROR] ${err instanceof Error ? err.message : String(err)}`]);
+      setDeployDone(true);
+      setDeploySuccess(false);
+    } finally {
+      setDeploying(false);
+    }
+  };
+
+  const handleManualAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!serverId || !ip) return;
 
@@ -280,7 +328,7 @@ function AddServerModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="w-full max-w-md bg-[var(--card)] border border-[var(--border)] rounded-lg p-6">
+      <div className="w-full max-w-lg bg-[var(--card)] border border-[var(--border)] rounded-lg p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-[var(--foreground)]">添加服务器</h2>
           <button
@@ -290,73 +338,208 @@ function AddServerModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
             <X className="w-5 h-5" />
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
+
+        {/* Mode Tabs */}
+        <div className="flex gap-2 mb-4">
+          <button
+            type="button"
+            onClick={() => setMode('auto')}
+            className={`flex-1 px-4 py-2 text-sm rounded-lg border transition-colors ${
+              mode === 'auto'
+                ? 'bg-[var(--primary)] text-white border-[var(--primary)]'
+                : 'bg-[var(--background)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)]'
+            }`}
+          >
+            自动部署
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('manual')}
+            className={`flex-1 px-4 py-2 text-sm rounded-lg border transition-colors ${
+              mode === 'manual'
+                ? 'bg-[var(--primary)] text-white border-[var(--primary)]'
+                : 'bg-[var(--background)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)]'
+            }`}
+          >
+            手动添加
+          </button>
+        </div>
+
+        {mode === 'auto' ? (
           <div>
-            <label className="block text-sm text-[var(--muted-foreground)] mb-1">
-              服务器 ID *
-            </label>
-            <input
-              type="text"
-              value={serverId}
-              onChange={(e) => setServerId(e.target.value)}
-              placeholder="例如: vps-01"
-              className="w-full px-3 py-2 text-sm bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-[var(--primary)]"
-              required
-            />
+            {!deployDone ? (
+              <form onSubmit={handleAutoDeploy} className="space-y-4">
+                <p className="text-xs text-[var(--muted-foreground)] mb-2">
+                  通过 SSH 连接目标服务器，自动安装并启动监控 Agent
+                </p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-2">
+                    <label className="block text-sm text-[var(--muted-foreground)] mb-1">
+                      IP 地址 *
+                    </label>
+                    <input
+                      type="text"
+                      value={sshIp}
+                      onChange={(e) => setSshIp(e.target.value)}
+                      placeholder="例如: 103.6.235.13"
+                      className="w-full px-3 py-2 text-sm bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-[var(--primary)]"
+                      required
+                      disabled={deploying}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-[var(--muted-foreground)] mb-1">
+                      SSH 端口
+                    </label>
+                    <input
+                      type="text"
+                      value={sshPort}
+                      onChange={(e) => setSshPort(e.target.value)}
+                      placeholder="22"
+                      className="w-full px-3 py-2 text-sm bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-[var(--primary)]"
+                      disabled={deploying}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-[var(--muted-foreground)] mb-1">
+                    用户名 *
+                  </label>
+                  <input
+                    type="text"
+                    value={sshUser}
+                    onChange={(e) => setSshUser(e.target.value)}
+                    placeholder="root"
+                    className="w-full px-3 py-2 text-sm bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-[var(--primary)]"
+                    required
+                    disabled={deploying}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-[var(--muted-foreground)] mb-1">
+                    密码 *
+                  </label>
+                  <input
+                    type="password"
+                    value={sshPassword}
+                    onChange={(e) => setSshPassword(e.target.value)}
+                    placeholder="SSH 密码"
+                    className="w-full px-3 py-2 text-sm bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-[var(--primary)]"
+                    required
+                    disabled={deploying}
+                  />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="flex-1 px-4 py-2 text-sm text-[var(--muted-foreground)] bg-[var(--background)] border border-[var(--border)] rounded-lg hover:bg-[var(--muted)] transition-colors"
+                    disabled={deploying}
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={deploying}
+                    className="flex-1 px-4 py-2 text-sm text-white bg-[var(--primary)] rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+                  >
+                    {deploying ? '部署中...' : '一键部署'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="space-y-3">
+                <div className={`flex items-center gap-2 p-3 rounded-lg ${deploySuccess ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                  <span className={`text-sm font-medium ${deploySuccess ? 'text-green-700' : 'text-red-700'}`}>
+                    {deploySuccess ? '部署成功！' : '部署失败'}
+                  </span>
+                </div>
+                <div className="bg-[var(--background)] border border-[var(--border)] rounded-lg p-3 max-h-48 overflow-y-auto">
+                  <pre className="text-xs font-mono text-[var(--muted-foreground)] whitespace-pre-wrap">
+                    {deployLogs.join('\n')}
+                  </pre>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="flex-1 px-4 py-2 text-sm text-white bg-[var(--primary)] rounded-lg hover:opacity-90 transition-opacity"
+                  >
+                    {deploySuccess ? '完成' : '关闭'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-          <div>
-            <label className="block text-sm text-[var(--muted-foreground)] mb-1">
-              主机名
-            </label>
-            <input
-              type="text"
-              value={hostname}
-              onChange={(e) => setHostname(e.target.value)}
-              placeholder="例如: my-vps"
-              className="w-full px-3 py-2 text-sm bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-[var(--primary)]"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-[var(--muted-foreground)] mb-1">
-              IP 地址 *
-            </label>
-            <input
-              type="text"
-              value={ip}
-              onChange={(e) => setIp(e.target.value)}
-              placeholder="例如: 192.168.1.100"
-              className="w-full px-3 py-2 text-sm bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-[var(--primary)]"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-[var(--muted-foreground)] mb-1">
-              备注
-            </label>
-            <input
-              type="text"
-              value={remark}
-              onChange={(e) => setRemark(e.target.value)}
-              placeholder="例如: 生产环境 Web 服务器"
-              className="w-full px-3 py-2 text-sm bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-[var(--primary)]"
-            />
-          </div>
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 text-sm text-[var(--muted-foreground)] bg-[var(--background)] border border-[var(--border)] rounded-lg hover:bg-[var(--muted)] transition-colors"
-            >
-              取消
-            </button>
-            <button
-              type="submit"
-              className="flex-1 px-4 py-2 text-sm text-white bg-[var(--primary)] rounded-lg hover:opacity-90 transition-opacity"
-            >
-              添加
-            </button>
-          </div>
-        </form>
+        ) : (
+          <form onSubmit={handleManualAdd} className="space-y-4">
+            <div>
+              <label className="block text-sm text-[var(--muted-foreground)] mb-1">
+                服务器 ID *
+              </label>
+              <input
+                type="text"
+                value={serverId}
+                onChange={(e) => setServerId(e.target.value)}
+                placeholder="例如: vps-01"
+                className="w-full px-3 py-2 text-sm bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-[var(--primary)]"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-[var(--muted-foreground)] mb-1">
+                主机名
+              </label>
+              <input
+                type="text"
+                value={hostname}
+                onChange={(e) => setHostname(e.target.value)}
+                placeholder="例如: my-vps"
+                className="w-full px-3 py-2 text-sm bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-[var(--primary)]"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-[var(--muted-foreground)] mb-1">
+                IP 地址 *
+              </label>
+              <input
+                type="text"
+                value={ip}
+                onChange={(e) => setIp(e.target.value)}
+                placeholder="例如: 192.168.1.100"
+                className="w-full px-3 py-2 text-sm bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-[var(--primary)]"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-[var(--muted-foreground)] mb-1">
+                备注
+              </label>
+              <input
+                type="text"
+                value={remark}
+                onChange={(e) => setRemark(e.target.value)}
+                placeholder="例如: 生产环境 Web 服务器"
+                className="w-full px-3 py-2 text-sm bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-[var(--primary)]"
+              />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 px-4 py-2 text-sm text-[var(--muted-foreground)] bg-[var(--background)] border border-[var(--border)] rounded-lg hover:bg-[var(--muted)] transition-colors"
+              >
+                取消
+              </button>
+              <button
+                type="submit"
+                className="flex-1 px-4 py-2 text-sm text-white bg-[var(--primary)] rounded-lg hover:opacity-90 transition-opacity"
+              >
+                添加
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );
