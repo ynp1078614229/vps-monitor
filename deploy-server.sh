@@ -119,6 +119,17 @@ install_deps() {
     info "正在安装依赖..."
     cd "$INSTALL_DIR"
     pnpm install --prod
+    
+    # 安装 sshpass 用于 SSH 自动部署功能
+    info "安装 sshpass (用于 SSH 自动部署)..."
+    if command -v apt-get &> /dev/null; then
+        apt-get install -y sshpass > /dev/null 2>&1 || warn "sshpass 安装失败，SSH 自动部署功能可能不可用"
+    elif command -v yum &> /dev/null; then
+        yum install -y sshpass > /dev/null 2>&1 || warn "sshpass 安装失败，SSH 自动部署功能可能不可用"
+    elif command -v dnf &> /dev/null; then
+        dnf install -y sshpass > /dev/null 2>&1 || warn "sshpass 安装失败，SSH 自动部署功能可能不可用"
+    fi
+    
     success "依赖安装完成"
 }
 

@@ -14,6 +14,9 @@
 - **自动刷新**: 5 秒间隔自动更新数据
 - **轻量 Agent**: 无额外依赖，纯 Node.js 实现
 - **Bearer Token 认证**: 安全的 Agent 通信
+- **SSH 一键部署**: 通过面板自动部署 Agent 到目标服务器
+- **服务器备注**: 支持为每台服务器添加备注信息
+- **浅色主题**: 清新明亮的白色界面设计
 
 ## 架构
 
@@ -87,8 +90,26 @@ bash deploy-agent.sh --server http://monitor:8080 --secret my-secret --id my-vps
 | 路径 | 方法 | 说明 |
 |------|------|------|
 | `/api/servers` | GET | 获取所有服务器列表 |
+| `/api/servers` | POST | 手动添加服务器 |
+| `/api/servers` | PATCH | 更新服务器备注 |
+| `/api/servers/[id]` | DELETE | 删除服务器 |
 | `/api/servers/[id]/metrics` | GET | 获取服务器指标历史 |
 | `/api/agent/report` | POST | Agent 上报指标 |
+| `/api/deploy` | POST | SSH 自动部署 Agent |
+| `/api/server-info` | GET | 获取当前服务器信息 |
+
+## 面板功能
+
+### 添加服务器
+
+1. **自动部署**（推荐）: 输入目标服务器 SSH 信息，自动部署 Agent
+2. **手动添加**: 手动填写服务器信息，适用于已部署 Agent 的服务器
+
+### 服务器管理
+
+- 删除服务器
+- 编辑服务器备注
+- 查看实时指标和历史图表
 
 ### Agent 上报数据格式
 
