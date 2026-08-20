@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { upsertServer } from '@/lib/store';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
 export const runtime = 'nodejs';
 
-// 动态导入 ssh2 避免 Turbopack 打包问题
-async function getSSHClient() {
-  const { Client } = await import('ssh2');
-  return new Client();
-}
+const execAsync = promisify(exec);
 
 interface DeployRequest {
   ip: string;
@@ -28,118 +26,107 @@ interface DeployResult {
   serverId?: string;
 }
 
-function execSSH(
-  conn: any,
+// 使用系统 sshpass + ssh 命令执行远程命令
+async function execRemote(
+  ip: string,
+  port: number,
+  username: string,
+  password: string,
   command: string,
   logs: string[]
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    conn.exec(command, (err: Error | undefined, stream: any) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-
-      let output = '';
-      let errorOutput = '';
-
-      stream
-        .on('close', (code: number) => {
-          if (output) logs.push(output.trim());
-          if (errorOutput && code !== 0) logs.push(`[stderr] ${errorOutput.trim()}`);
-          resolve(output);
-        })
-        .on('data', (data: Buffer) => {
-          const text = data.toString();
-          output += text;
-        })
-        .stderr.on('data', (data: Buffer) => {
-          errorOutput += data.toString();
-        });
-    });
-  });
+): Promise<{ stdout: string; stderr: string; code: number }> {
+  const sshCmd = `sshpass -p '${password.replace(/'/g, "'\\''")}' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -p ${port} ${username}@${ip} '${command.replace(/'/g, "'\\''")}'`;
+  
+  try {
+    const { stdout, stderr } = await execAsync(sshCmd, { timeout: 300000 });
+    if (stdout) logs.push(stdout.trim());
+    return { stdout, stderr, code: 0 };
+  } catch (error: any) {
+    const code = error.code || 1;
+    const stdout = error.stdout || '';
+    const stderr = error.stderr || error.message || '';
+    if (stdout) logs.push(stdout.trim());
+    if (stderr) logs.push(`[stderr] ${stderr.trim()}`);
+    return { stdout, stderr, code };
+  }
 }
 
-async function deployAgent(params: DeployRequest): Promise<DeployResult> {
+// 测试 SSH 连接
+async function testSSHConnection(
+  ip: string,
+  port: number,
+  username: string,
+  password: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await execAsync(
+      `sshpass -p '${password.replace(/'/g, "'\\''")}' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -p ${port} ${username}@${ip} 'echo OK'`,
+      { timeout: 15000 }
+    );
+    return { success: true };
+  } catch (error: any) {
+    const msg = error.stderr || error.message || '';
+    if (msg.includes('Permission denied') || msg.includes('password')) {
+      return { success: false, error: 'SSH 认证失败，请检查用户名和密码' };
+    }
+    if (msg.includes('Connection refused')) {
+      return { success: false, error: `连接被拒绝，请检查 IP 和端口 (${port})` };
+    }
+    if (msg.includes('Connection timed out') || msg.includes('ETIMEDOUT')) {
+      return { success: false, error: '连接超时，请检查网络和防火墙' };
+    }
+    if (msg.includes('No route to host')) {
+      return { success: false, error: '无法到达目标主机，请检查 IP 地址' };
+    }
+    return { success: false, error: `SSH 连接失败: ${msg.slice(0, 100)}` };
+  }
+}
+
+// 后台执行部署（不等待完成）
+async function deployInBackground(
+  ip: string,
+  port: number,
+  username: string,
+  password: string,
+  monitorUrl: string,
+  serverId: string,
+  secret: string
+): Promise<void> {
   const logs: string[] = [];
-  const {
-    ip,
-    port = 22,
-    username,
-    password,
-    privateKey,
-    serverId,
-    hostname,
-    secret = 'vps-monitor-default-secret',
-    monitorUrl,
-  } = params;
+  
+  try {
+    // 检测操作系统
+    logs.push('[INFO] 检测操作系统...');
+    const osResult = await execRemote(ip, port, username, password, 'cat /etc/os-release 2>/dev/null | head -5', logs);
+    const isUbuntu = osResult.stdout.toLowerCase().includes('ubuntu');
+    const isDebian = osResult.stdout.toLowerCase().includes('debian');
+    const isCentOS = osResult.stdout.toLowerCase().includes('centos') || osResult.stdout.toLowerCase().includes('rhel');
+    logs.push(`[INFO] 系统: ${isUbuntu ? 'Ubuntu' : isDebian ? 'Debian' : isCentOS ? 'CentOS/RHEL' : '未知'}`);
 
-  return new Promise(async (resolve) => {
-    const conn = await getSSHClient();
-    const timeout = setTimeout(() => {
-      conn.end();
-      resolve({
-        success: false,
-        message: 'SSH 连接超时',
-        logs,
-      });
-    }, 30000);
+    // 检查并安装 Node.js
+    logs.push('[INFO] 检查 Node.js...');
+    const nodeCheck = await execRemote(ip, port, username, password, 'node --version 2>/dev/null || echo "NOT_FOUND"', logs);
+    
+    if (nodeCheck.stdout.includes('NOT_FOUND')) {
+      logs.push('[INFO] 安装 Node.js...');
+      if (isUbuntu || isDebian) {
+        await execRemote(ip, port, username, password, 
+          'curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && apt-get install -y nodejs', logs);
+      } else if (isCentOS) {
+        await execRemote(ip, port, username, password,
+          'curl -fsSL https://rpm.nodesource.com/setup_18.x | bash - && yum install -y nodejs', logs);
+      }
+    }
 
-    conn.on('ready', async () => {
-      logs.push('[OK] SSH 连接成功');
+    // 创建目录并下载 Agent
+    logs.push('[INFO] 部署 Agent...');
+    await execRemote(ip, port, username, password, 'mkdir -p /opt/vps-agent', logs);
+    await execRemote(ip, port, username, password,
+      `curl -sSL -o /opt/vps-agent/vps-monitor.js "${monitorUrl}/agent/vps-monitor.js"`, logs);
 
-      try {
-        // 检测操作系统
-        const osInfo = await execSSH(conn, 'cat /etc/os-release 2>/dev/null | head -5', logs);
-        logs.push(`[INFO] 系统信息: ${osInfo.split('\n')[0] || '未知'}`);
-
-        // 检查 Node.js
-        const nodeCheck = await execSSH(conn, 'node --version 2>/dev/null || echo "NOT_FOUND"', logs);
-        
-        if (nodeCheck.includes('NOT_FOUND')) {
-          logs.push('[INFO] 正在安装 Node.js...');
-          
-          // 检测包管理器
-          if (osInfo.includes('Ubuntu') || osInfo.includes('Debian')) {
-            await execSSH(conn, 'curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs', logs);
-          } else if (osInfo.includes('CentOS') || osInfo.includes('RHEL') || osInfo.includes('Rocky') || osInfo.includes('AlmaLinux')) {
-            await execSSH(conn, 'curl -fsSL https://rpm.nodesource.com/setup_18.x | bash - && yum install -y nodejs', logs);
-          } else {
-            logs.push('[WARN] 未识别的系统，尝试通用安装...');
-            await execSSH(conn, 'curl -fsSL https://fnm.vercel.app/install | bash && export PATH="$HOME/.local/share/fnm:$PATH" && eval "$(fnm env)" && fnm install 20 && fnm use 20', logs);
-          }
-
-          const nodeVersion = await execSSH(conn, 'node --version 2>/dev/null || echo "FAILED"', logs);
-          if (nodeVersion.includes('FAILED')) {
-            clearTimeout(timeout);
-            conn.end();
-            resolve({
-              success: false,
-              message: 'Node.js 安装失败',
-              logs,
-            });
-            return;
-          }
-          logs.push(`[OK] Node.js ${nodeVersion.trim()} 安装成功`);
-        } else {
-          logs.push(`[OK] Node.js ${nodeCheck.trim()} 已安装`);
-        }
-
-        // 获取服务器 hostname 作为默认 ID
-        const actualHostname = hostname || (await execSSH(conn, 'hostname', logs)).trim();
-        const actualServerId = serverId || actualHostname;
-
-        // 确定监控面板地址
-        const actualMonitorUrl = monitorUrl || `http://${process.env.COZE_PROJECT_DOMAIN_DEFAULT || 'localhost:8080'}`;
-
-        // 部署 Agent
-        logs.push('[INFO] 正在部署监控 Agent...');
-        
-        const deployScript = `
-mkdir -p /opt/vps-agent && \\
-curl -sSL -o /opt/vps-agent/vps-monitor.js ${actualMonitorUrl}/agent/vps-monitor.js && \\
-cat > /etc/systemd/system/vps-agent.service << 'AGENTEOF'
-[Unit]
+    // 创建 systemd 服务
+    logs.push('[INFO] 创建系统服务...');
+    const serviceContent = `[Unit]
 Description=VPS Monitor Agent
 After=network.target
 
@@ -148,191 +135,111 @@ Type=simple
 User=root
 WorkingDirectory=/opt/vps-agent
 Environment=AGENT_SECRET=${secret}
-Environment=SERVER_URL=${actualMonitorUrl}
-Environment=SERVER_ID=${actualServerId}
+Environment=SERVER_URL=${monitorUrl}
+Environment=SERVER_ID=${serverId}
 Environment=REPORT_INTERVAL=5
 ExecStart=/usr/bin/node vps-monitor.js
 Restart=always
 RestartSec=10
 
 [Install]
-WantedBy=multi-user.target
-AGENTEOF
-systemctl daemon-reload && \\
-systemctl enable vps-agent && \\
-systemctl restart vps-agent
-`;
+WantedBy=multi-user.target`;
 
-        await execSSH(conn, deployScript, logs);
-        logs.push('[OK] Agent 服务已启动');
+    await execRemote(ip, port, username, password,
+      `cat > /etc/systemd/system/vps-agent.service << 'AGENTEOF'
+${serviceContent}
+AGENTEOF`, logs);
 
-        // 等待几秒后检查状态
-        await new Promise((r) => setTimeout(r, 3000));
-        
-        const status = await execSSH(conn, 'systemctl is-active vps-agent 2>/dev/null', logs);
-        if (status.trim() === 'active') {
-          logs.push('[OK] Agent 运行正常');
-        } else {
-          logs.push(`[WARN] Agent 状态: ${status.trim()}`);
-        }
+    // 启动服务
+    logs.push('[INFO] 启动 Agent...');
+    await execRemote(ip, port, username, password,
+      'systemctl daemon-reload && systemctl enable vps-agent && systemctl restart vps-agent', logs);
 
-        // 检查日志确认数据上报
-        const agentLogs = await execSSH(conn, 'journalctl -u vps-agent -n 5 --no-pager 2>/dev/null | tail -5', logs);
-        logs.push(`[INFO] Agent 日志: ${agentLogs.split('\n').pop() || '无'}`);
-
-        // 在 store 中注册服务器
-        const now = Date.now();
-        upsertServer({
-          id: actualServerId,
-          hostname: actualHostname,
-          ip,
-          os: osInfo.split('\n').find(l => l.startsWith('PRETTY_NAME'))?.split('=')[1]?.replace(/"/g, '') || '未知',
-          kernel: '',
-          cpuModel: '',
-          cpuCores: 0,
-          totalMemory: 0,
-          totalDisk: 0,
-          agentVersion: '1.0.0',
-          firstSeen: now,
-          lastSeen: now,
-        }, {
-          timestamp: now,
-          cpuUsage: 0,
-          memoryUsage: 0,
-          memoryUsed: 0,
-          diskUsage: 0,
-          diskUsed: 0,
-          networkRxBytes: 0,
-          networkTxBytes: 0,
-          totalRxBytes: 0,
-          totalTxBytes: 0,
-          loadAvg1: 0,
-          loadAvg5: 0,
-          loadAvg15: 0,
-          uptime: 0,
-        });
-
-        clearTimeout(timeout);
-        conn.end();
-        resolve({
-          success: true,
-          message: '监控 Agent 部署成功',
-          logs,
-          serverId: actualServerId,
-        });
-      } catch (error: unknown) {
-        clearTimeout(timeout);
-        conn.end();
-        const errMsg = error instanceof Error ? error.message : String(error);
-        logs.push(`[ERROR] ${errMsg}`);
-        resolve({
-          success: false,
-          message: `部署失败: ${errMsg}`,
-          logs,
-        });
-      }
+    logs.push('[SUCCESS] Agent 部署完成！');
+    
+    // 注册服务器到存储
+    upsertServer({
+      id: serverId,
+      hostname: serverId,
+      ip: ip,
+      os: isUbuntu ? 'Ubuntu' : isDebian ? 'Debian' : isCentOS ? 'CentOS' : 'Unknown',
+      kernel: '',
+      cpuModel: '',
+      cpuCores: 0,
+      totalMemory: 0,
+      totalDisk: 0,
+      agentVersion: '1.0.0',
+      firstSeen: Date.now(),
+      lastSeen: Date.now(),
+    }, {
+      timestamp: Date.now(),
+      cpuUsage: 0,
+      memoryUsed: 0,
+      memoryUsage: 0,
+      diskUsed: 0,
+      diskUsage: 0,
+      networkRxBytes: 0,
+      networkTxBytes: 0,
+      totalRxBytes: 0,
+      totalTxBytes: 0,
+      loadAvg1: 0,
+      loadAvg5: 0,
+      loadAvg15: 0,
+      uptime: 0,
     });
 
-    conn.on('error', (err: Error) => {
-      clearTimeout(timeout);
-      logs.push(`[ERROR] SSH 连接失败: ${err.message}`);
-      resolve({
-        success: false,
-        message: `SSH 连接失败: ${err.message}`,
-        logs,
-      });
-    });
-
-    conn.connect({
-      host: ip,
-      port,
-      username,
-      password,
-      privateKey: privateKey || undefined,
-      readyTimeout: 15000,
-      algorithms: {
-        kex: [
-          'ecdh-sha2-nistp256',
-          'ecdh-sha2-nistp384',
-          'ecdh-sha2-nistp521',
-          'diffie-hellman-group-exchange-sha256',
-          'diffie-hellman-group14-sha256',
-          'diffie-hellman-group14-sha1',
-          'diffie-hellman-group1-sha1',
-        ],
-      },
-    });
-  });
+  } catch (error: any) {
+    logs.push(`[ERROR] 部署失败: ${error.message}`);
+  }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { ip, port, username, password, privateKey, serverId, hostname, secret, monitorUrl } = body as DeployRequest;
+    const body: DeployRequest = await request.json();
+    const {
+      ip,
+      port = 22,
+      username = 'root',
+      password,
+      serverId,
+      monitorUrl,
+    } = body;
 
-    if (!ip || !username || (!password && !privateKey)) {
+    if (!ip || !password) {
       return NextResponse.json(
-        { error: '请提供 IP、用户名和密码（或私钥）' },
+        { success: false, message: '缺少必要参数: ip, password' },
         { status: 400 }
       );
     }
+
+    const actualMonitorUrl = monitorUrl || `http://${process.env.COZE_PROJECT_DOMAIN_DEFAULT || 'localhost:8080'}`;
+    const actualServerId = serverId || `server-${ip.replace(/\./g, '-')}`;
+    const secret = process.env.AGENT_SECRET || 'vps-monitor-default-secret';
 
     // 先测试 SSH 连接
-    let sshClient: Awaited<ReturnType<typeof getSSHClient>>;
-    try {
-      sshClient = await getSSHClient();
-      await new Promise<void>((resolve, reject) => {
-        sshClient.on('ready', () => resolve()).on('error', (err: Error) => reject(err));
-        sshClient.connect({
-          host: ip,
-          port: port || 22,
-          username,
-          password,
-          privateKey,
-        });
-      });
-    } catch (connErr) {
-      const errMsg = connErr instanceof Error ? connErr.message : '连接失败';
+    const connTest = await testSSHConnection(ip, port, username, password);
+    if (!connTest.success) {
       return NextResponse.json(
-        { error: `SSH 连接失败: ${errMsg}` },
+        { success: false, message: connTest.error || 'SSH 连接失败' },
         { status: 400 }
       );
     }
 
-    // SSH 连接成功，关闭测试连接
-    sshClient.end();
+    // SSH 连接成功，启动后台部署
+    deployInBackground(ip, port, username, password, actualMonitorUrl, actualServerId, secret).catch(err => {
+      console.error('Background deploy error:', err);
+    });
 
-    // 后台异步执行部署
-    setTimeout(() => {
-      deployAgent({
-        ip,
-        port,
-        username,
-        password,
-        privateKey,
-        serverId,
-        hostname,
-        secret,
-        monitorUrl,
-      }).then((result) => {
-        if (result.success) {
-          console.log(`[Deploy] 服务器 ${ip} 部署成功: ${result.serverId}`);
-        } else {
-          console.log(`[Deploy] 服务器 ${ip} 部署失败: ${result.message}`);
-        }
-      }).catch((err) => {
-        console.error(`[Deploy] 服务器 ${ip} 部署异常:`, err);
-      });
-    }, 0);
-
+    // 立即返回成功
     return NextResponse.json({
       success: true,
       message: 'SSH 连接成功，正在后台部署监控 Agent...',
-      ip,
+      serverId: actualServerId,
     });
-  } catch {
+
+  } catch (error: any) {
     return NextResponse.json(
-      { error: '部署请求处理失败' },
+      { success: false, message: `部署失败: ${error.message}` },
       { status: 500 }
     );
   }
