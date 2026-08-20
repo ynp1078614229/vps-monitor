@@ -41,7 +41,7 @@ function formatBytes(bytes: number): string {
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
+  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
 }
 
 function getUsageColor(usage: number): string {
@@ -99,7 +99,7 @@ export function ServerCard({
   return (
     <div
       onClick={onClick}
-      className="card-hover bg-[var(--card)] border border-[var(--border)] rounded-lg p-5 cursor-pointer transition-all duration-200 relative group"
+      className="card-hover bg-[var(--card)] border border-[var(--border)] rounded-lg p-3 cursor-pointer transition-all duration-200 relative group"
     >
       {/* Delete button */}
       <button
@@ -107,75 +107,26 @@ export function ServerCard({
           e.stopPropagation();
           onDelete();
         }}
-        className="absolute top-3 right-3 p-1.5 text-[var(--muted-foreground)] hover:text-[var(--status-offline)] opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute top-2 right-2 p-1 text-[var(--muted-foreground)] hover:text-[var(--status-offline)] opacity-0 group-hover:opacity-100 transition-opacity"
         title="删除服务器"
       >
-        <Trash2 className="w-4 h-4" />
+        <Trash2 className="w-3.5 h-3.5" />
       </button>
+
       {/* Header: 名称 + 状态 */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <StatusIndicator online={online} />
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <StatusIndicator online={online} size="sm" />
           <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-semibold text-[var(--foreground)]">
+            <h3 className="text-xs font-semibold text-[var(--foreground)] truncate">
               {hostname}
             </h3>
-            <p className="text-xs text-[var(--muted-foreground)] font-mono">
+            <p className="text-[10px] text-[var(--muted-foreground)] font-mono truncate">
               {ip}
             </p>
-            {/* 备注显示/编辑 */}
-            {isEditingRemark ? (
-              <div className="flex items-center gap-1 mt-1" onClick={(e) => e.stopPropagation()}>
-                <input
-                  type="text"
-                  value={editRemarkValue}
-                  onChange={(e) => setEditRemarkValue(e.target.value)}
-                  className="text-xs border border-[var(--border)] rounded px-1.5 py-0.5 flex-1 min-w-0 bg-[var(--card)] text-[var(--foreground)]"
-                  placeholder="输入备注..."
-                  autoFocus
-                />
-                <button
-                  onClick={handleSaveRemark}
-                  className="p-0.5 text-[var(--status-online)] hover:text-green-600"
-                  title="保存"
-                >
-                  <Check className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={handleCancelEdit}
-                  className="p-0.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-                  title="取消"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1 mt-0.5">
-                {remark ? (
-                  <p className="text-xs text-[var(--muted-foreground)] italic truncate">
-                    {remark}
-                  </p>
-                ) : (
-                  <p className="text-xs text-[var(--muted-foreground)]/50 italic">
-                    点击添加备注
-                  </p>
-                )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setEditRemarkValue(remark || '');
-                    setIsEditingRemark(true);
-                  }}
-                  className="p-0.5 text-[var(--muted-foreground)] hover:text-[var(--primary)] opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="编辑备注"
-                >
-                  <Pencil className="w-3 h-3" />
-                </button>
-              </div>
-            )}
           </div>
         </div>
-        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
           online
             ? 'bg-green-50 text-[var(--status-online)]'
             : 'bg-red-50 text-[var(--status-offline)]'
@@ -184,19 +135,62 @@ export function ServerCard({
         </span>
       </div>
 
+      {/* 备注 */}
+      {isEditingRemark ? (
+        <div className="flex items-center gap-1 mb-2" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="text"
+            value={editRemarkValue}
+            onChange={(e) => setEditRemarkValue(e.target.value)}
+            className="text-[10px] border border-[var(--border)] rounded px-1 py-0.5 flex-1 min-w-0 bg-[var(--card)] text-[var(--foreground)]"
+            placeholder="备注..."
+            autoFocus
+          />
+          <button onClick={handleSaveRemark} className="p-0.5 text-[var(--status-online)]" title="保存">
+            <Check className="w-3 h-3" />
+          </button>
+          <button onClick={handleCancelEdit} className="p-0.5 text-[var(--muted-foreground)]" title="取消">
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1 mb-2">
+          {remark ? (
+            <p className="text-[10px] text-[var(--muted-foreground)] italic truncate flex-1">
+              {remark}
+            </p>
+          ) : (
+            <p className="text-[10px] text-[var(--muted-foreground)]/50 italic flex-1">
+              添加备注
+            </p>
+          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setEditRemarkValue(remark || '');
+              setIsEditingRemark(true);
+            }}
+            className="p-0.5 text-[var(--muted-foreground)] hover:text-[var(--primary)] opacity-0 group-hover:opacity-100 transition-opacity"
+            title="编辑备注"
+          >
+            <Pencil className="w-2.5 h-2.5" />
+          </button>
+        </div>
+      )}
+
       {/* Metrics */}
       {online && latest ? (
-        <div className="space-y-3">
+        <div className="space-y-1.5">
           {/* CPU */}
           <div>
-            <div className="flex justify-between items-center mb-1.5">
-              <span className="text-xs text-[var(--muted-foreground)]">CPU</span>
-              <span className={`metric-value text-sm ${getUsageColor(latest.cpuUsage)}`}>
+            <div className="flex justify-between items-center mb-0.5">
+              <span className="text-[10px] text-[var(--muted-foreground)]">CPU</span>
+              <span className={`metric-value text-xs ${getUsageColor(latest.cpuUsage)}`}>
                 {latest.cpuUsage.toFixed(1)}
                 <span className="metric-unit">%</span>
               </span>
             </div>
-            <div className="h-1.5 bg-[var(--muted)] rounded-full overflow-hidden">
+            <div className="h-1 bg-[var(--muted)] rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-500 ${getUsageBgColor(latest.cpuUsage)}`}
                 style={{ width: `${Math.min(100, latest.cpuUsage)}%` }}
@@ -206,14 +200,14 @@ export function ServerCard({
 
           {/* Memory */}
           <div>
-            <div className="flex justify-between items-center mb-1.5">
-              <span className="text-xs text-[var(--muted-foreground)]">内存</span>
-              <span className={`metric-value text-sm ${getUsageColor(latest.memoryUsage)}`}>
+            <div className="flex justify-between items-center mb-0.5">
+              <span className="text-[10px] text-[var(--muted-foreground)]">内存</span>
+              <span className={`metric-value text-xs ${getUsageColor(latest.memoryUsage)}`}>
                 {latest.memoryUsage.toFixed(1)}
                 <span className="metric-unit">%</span>
               </span>
             </div>
-            <div className="h-1.5 bg-[var(--muted)] rounded-full overflow-hidden">
+            <div className="h-1 bg-[var(--muted)] rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-500 ${getUsageBgColor(latest.memoryUsage)}`}
                 style={{ width: `${Math.min(100, latest.memoryUsage)}%` }}
@@ -221,46 +215,45 @@ export function ServerCard({
             </div>
           </div>
 
-          {/* Network - Real-time + Cumulative */}
-          <div className="pt-3 border-t border-[var(--border)] space-y-2">
-            {/* Real-time speed */}
-            <div className="flex gap-4">
+          {/* Network - Compact */}
+          <div className="pt-1.5 border-t border-[var(--border)]">
+            <div className="flex gap-2">
               <div className="flex-1">
-                <div className="flex items-center gap-1.5 mb-0.5">
-                  <span className="relative flex h-1.5 w-1.5">
+                <div className="flex items-center gap-1">
+                  <span className="relative flex h-1 w-1">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--chart-4)] opacity-75" />
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[var(--chart-4)]" />
+                    <span className="relative inline-flex rounded-full h-1 w-1 bg-[var(--chart-4)]" />
                   </span>
-                  <span className="text-xs text-[var(--muted-foreground)]">上传</span>
+                  <span className="text-[10px] text-[var(--muted-foreground)]">↑</span>
                 </div>
-                <p className="metric-value text-sm text-[var(--chart-4)]">
+                <p className="metric-value text-[10px] text-[var(--chart-4)]">
                   {formatKB(latest.networkTxBytes)}<span className="metric-unit">/s</span>
                 </p>
               </div>
               <div className="flex-1">
-                <div className="flex items-center gap-1.5 mb-0.5">
-                  <span className="relative flex h-1.5 w-1.5">
+                <div className="flex items-center gap-1">
+                  <span className="relative flex h-1 w-1">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--chart-1)] opacity-75" />
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[var(--chart-1)]" />
+                    <span className="relative inline-flex rounded-full h-1 w-1 bg-[var(--chart-1)]" />
                   </span>
-                  <span className="text-xs text-[var(--muted-foreground)]">下载</span>
+                  <span className="text-[10px] text-[var(--muted-foreground)]">↓</span>
                 </div>
-                <p className="metric-value text-sm text-[var(--chart-1)]">
+                <p className="metric-value text-[10px] text-[var(--chart-1)]">
                   {formatKB(latest.networkRxBytes)}<span className="metric-unit">/s</span>
                 </p>
               </div>
             </div>
             {/* Cumulative traffic */}
-            <div className="flex gap-4 pt-2 border-t border-dashed border-[var(--border)]">
+            <div className="flex gap-2 pt-1 mt-1 border-t border-dashed border-[var(--border)]">
               <div className="flex-1">
-                <span className="text-xs text-[var(--muted-foreground)]">累计上传</span>
-                <p className="metric-value text-xs text-[var(--foreground)]">
+                <span className="text-[10px] text-[var(--muted-foreground)]">总↑</span>
+                <p className="metric-value text-[10px] text-[var(--foreground)]">
                   {formatBytes(latest.totalTxBytes)}
                 </p>
               </div>
               <div className="flex-1">
-                <span className="text-xs text-[var(--muted-foreground)]">累计下载</span>
-                <p className="metric-value text-xs text-[var(--foreground)]">
+                <span className="text-[10px] text-[var(--muted-foreground)]">总↓</span>
+                <p className="metric-value text-[10px] text-[var(--foreground)]">
                   {formatBytes(latest.totalRxBytes)}
                 </p>
               </div>
@@ -268,8 +261,8 @@ export function ServerCard({
           </div>
         </div>
       ) : (
-        <div className="text-center py-4 text-sm text-[var(--muted-foreground)]">
-          {online ? '暂无数据' : `最后上报: ${timeAgo(lastSeen)}`}
+        <div className="text-center py-2 text-[10px] text-[var(--muted-foreground)]">
+          {online ? '暂无数据' : `${timeAgo(lastSeen)}`}
         </div>
       )}
     </div>
