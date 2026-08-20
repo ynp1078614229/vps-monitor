@@ -268,10 +268,8 @@ function AddServerModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
     e.preventDefault();
     if (!sshIp || !sshUser || !sshPassword) return;
 
+    // 先测试 SSH 连接（此时弹窗保持打开，显示加载状态）
     setDeploying(true);
-    setDeployLogs(['[INFO] 开始连接...']);
-    setDeployDone(false);
-
     try {
       const res = await fetch('/api/deploy', {
         method: 'POST',
@@ -288,18 +286,21 @@ function AddServerModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
         }),
       });
       const data = await res.json();
-      setDeployLogs(data.logs || []);
-      setDeployDone(true);
-      setDeploySuccess(data.success);
 
       if (data.success) {
+        // SSH 连接成功，关闭弹窗，后台继续部署
+        onClose();
+        // 显示提示（可选：可以添加 toast 通知）
+        alert('SSH 连接成功，正在后台部署监控 Agent...\nAgent 部署完成后将自动显示在监控面板。');
+        // 刷新列表
         onAdded();
+      } else {
+        // SSH 连接失败，显示错误，保持弹窗打开
+        alert(`部署失败: ${data.error || '未知错误'}`);
+        setDeploying(false);
       }
     } catch (err) {
-      setDeployLogs((prev) => [...prev, `[ERROR] ${err instanceof Error ? err.message : String(err)}`]);
-      setDeployDone(true);
-      setDeploySuccess(false);
-    } finally {
+      alert(`请求失败: ${err instanceof Error ? err.message : '网络错误'}`);
       setDeploying(false);
     }
   };

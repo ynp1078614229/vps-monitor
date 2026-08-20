@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Client } from 'ssh2';
 import { upsertServer } from '@/lib/store';
 
 export const runtime = 'nodejs';
+
+// 动态导入 ssh2 避免 Turbopack 打包问题
+async function getSSHClient() {
+  const { Client } = await import('ssh2');
+  return new Client();
+}
 
 interface DeployRequest {
   ip: string;
@@ -24,12 +29,12 @@ interface DeployResult {
 }
 
 function execSSH(
-  conn: Client,
+  conn: any,
   command: string,
   logs: string[]
 ): Promise<string> {
   return new Promise((resolve, reject) => {
-    conn.exec(command, (err, stream) => {
+    conn.exec(command, (err: Error | undefined, stream: any) => {
       if (err) {
         reject(err);
         return;
@@ -69,8 +74,8 @@ async function deployAgent(params: DeployRequest): Promise<DeployResult> {
     monitorUrl,
   } = params;
 
-  return new Promise((resolve) => {
-    const conn = new Client();
+  return new Promise(async (resolve) => {
+    const conn = await getSSHClient();
     const timeout = setTimeout(() => {
       conn.end();
       resolve({
@@ -272,19 +277,59 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await deployAgent({
-      ip,
-      port,
-      username,
-      password,
-      privateKey,
-      serverId,
-      hostname,
-      secret,
-      monitorUrl,
-    });
+    // 先测试 SSH 连接
+    let sshClient: Awaited<ReturnType<typeof getSSHClient>>;
+    try {
+      sshClient = await getSSHClient();
+      await new Promise<void>((resolve, reject) => {
+        sshClient.on('ready', () => resolve()).on('error', (err: Error) => reject(err));
+        sshClient.connect({
+          host: ip,
+          port: port || 22,
+          username,
+          password,
+          privateKey,
+        });
+      });
+    } catch (connErr) {
+      const errMsg = connErr instanceof Error ? connErr.message : '连接失败';
+      return NextResponse.json(
+        { error: `SSH 连接失败: ${errMsg}` },
+        { status: 400 }
+      );
+    }
 
-    return NextResponse.json(result);
+    // SSH 连接成功，关闭测试连接
+    sshClient.end();
+
+    // 后台异步执行部署
+    setTimeout(() => {
+      deployAgent({
+        ip,
+        port,
+        username,
+        password,
+        privateKey,
+        serverId,
+        hostname,
+        secret,
+        monitorUrl,
+      }).then((result) => {
+        if (result.success) {
+          console.log(`[Deploy] 服务器 ${ip} 部署成功: ${result.serverId}`);
+        } else {
+          console.log(`[Deploy] 服务器 ${ip} 部署失败: ${result.message}`);
+        }
+      }).catch((err) => {
+        console.error(`[Deploy] 服务器 ${ip} 部署异常:`, err);
+      });
+    }, 0);
+
+    return NextResponse.json({
+      success: true,
+      message: 'SSH 连接成功，正在后台部署监控 Agent...',
+      ip,
+    });
   } catch {
     return NextResponse.json(
       { error: '部署请求处理失败' },
