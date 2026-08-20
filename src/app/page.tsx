@@ -223,21 +223,6 @@ export default function DashboardPage() {
             ))}
           </div>
         )}
-
-        {/* Agent deployment info */}
-        <div className="mt-12 bg-[var(--card)] border border-[var(--border)] rounded-lg p-6">
-          <h2 className="text-sm font-semibold text-[var(--foreground)] mb-3">
-            部署监控 Agent
-          </h2>
-          <p className="text-xs text-[var(--muted-foreground)] mb-4">
-            在您的 VPS 上运行以下命令，开始采集服务器指标：
-          </p>
-          <div className="bg-[var(--muted)] border border-[var(--border)] rounded-lg p-4 font-mono text-xs text-[var(--muted-foreground)] overflow-x-auto">
-            <pre>{`# 下载并运行 VPS 监控 Agent
-curl -o vps-monitor.js <your-server-url>/agent/vps-monitor.js
-AGENT_SECRET="your-secret" SERVER_URL="<your-server-url>" node vps-monitor.js`}</pre>
-          </div>
-        </div>
       </div>
 
       {/* Add Server Modal */}
