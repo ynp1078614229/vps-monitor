@@ -5,10 +5,16 @@
 set -e
 
 # 默认值
-INSTANCE_NAME="vps-monitor"
-PORT="80"
-AGENT_SECRET="vps-monitor-default-secret"
+INSTANCE_NAME=""
+PORT=""
+AGENT_SECRET=""
 DATA_DIR="/opt/vps-monitor"
+
+# 检测是否在管道模式（curl | bash）
+IS_PIPE=false
+if [ ! -t 0 ]; then
+  IS_PIPE=true
+fi
 
 # 解析参数
 while [[ $# -gt 0 ]]; do
@@ -20,6 +26,45 @@ while [[ $# -gt 0 ]]; do
     *) echo "未知参数: $1"; exit 1 ;;
   esac
 done
+
+# 如果没有参数且是管道模式，显示帮助
+if [ -z "$INSTANCE_NAME" ] && [ -z "$PORT" ] && $IS_PIPE; then
+  echo "=========================================="
+  echo "VPS 监控面板 - 多实例部署"
+  echo "=========================================="
+  echo ""
+  echo "用法:"
+  echo "  方式1 (参数): curl -sSL URL | bash -s -- --name mypanel --port 8080 --secret mysecret"
+  echo "  方式2 (交互): curl -sSL -o deploy.sh URL && chmod +x deploy.sh && ./deploy.sh"
+  echo ""
+  echo "参数说明:"
+  echo "  --name    实例名称 (必填)"
+  echo "  --port    监听端口 (必填)"
+  echo "  --secret  Agent 认证密钥 (可选，默认: vps-monitor-default-secret)"
+  echo ""
+  echo "示例:"
+  echo "  curl -sSL URL | bash -s -- --name panel-8080 --port 8080 --secret my-secret"
+  exit 0
+fi
+
+# 交互模式（非管道）
+if ! $IS_PIPE; then
+  echo "=========================================="
+  echo "VPS 监控面板 - 多实例部署 (交互模式)"
+  echo "=========================================="
+  read -p "实例名称 [默认: vps-monitor]: " input_name
+  read -p "监听端口 [默认: 80]: " input_port
+  read -p "Agent 密钥 [默认: vps-monitor-default-secret]: " input_secret
+  
+  INSTANCE_NAME="${input_name:-vps-monitor}"
+  PORT="${input_port:-80}"
+  AGENT_SECRET="${input_secret:-vps-monitor-default-secret}"
+fi
+
+# 设置默认值（如果参数模式未提供）
+INSTANCE_NAME="${INSTANCE_NAME:-vps-monitor}"
+PORT="${PORT:-80}"
+AGENT_SECRET="${AGENT_SECRET:-vps-monitor-default-secret}"
 
 INSTALL_DIR="${DATA_DIR}/${INSTANCE_NAME}"
 SERVICE_NAME="vps-monitor-${INSTANCE_NAME}"
@@ -219,8 +264,8 @@ if [ "$1" = "--uninstall" ] || [ "$1" = "-u" ]; then
   exit 0
 fi
 
-# 无参数时进入菜单
-if [ $# -eq 0 ]; then
+# 无参数且非管道模式时进入菜单
+if [ $# -eq 0 ] && ! $IS_PIPE; then
   main_menu
   exit 0
 fi
