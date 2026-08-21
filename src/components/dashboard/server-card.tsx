@@ -340,10 +340,10 @@ export function ServerCard({
                 </p>
               </div>
             </div>
-            {/* Traffic warning */}
+            {/* Traffic limit with progress bar */}
             {trafficLimitGB && trafficLimitGB > 0 && (
               <div className={`pt-1 mt-1 border-t border-dashed border-[var(--border)]`}>
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center mb-0.5">
                   <span className="text-[10px] text-[var(--muted-foreground)]">
                     流量 {trafficMode === 'down' ? '(仅下行)' : '(上下行)'}
                   </span>
@@ -368,8 +368,27 @@ export function ServerCard({
                     )}
                   </div>
                 </div>
+                {/* Progress bar */}
+                <div className="h-1 bg-[var(--muted)] rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      trafficStatus.status === 'danger'
+                        ? 'bg-red-500'
+                        : trafficStatus.status === 'warning'
+                          ? 'bg-yellow-500'
+                          : 'bg-[var(--chart-1)]'
+                    }`}
+                    style={{ width: `${Math.min(100, trafficStatus.percentage)}%` }}
+                  />
+                </div>
                 <div className="flex justify-between items-center mt-0.5">
-                  <span className="text-[10px] text-[var(--muted-foreground)]">
+                  <span className={`text-[10px] ${
+                    trafficStatus.status === 'danger' 
+                      ? 'text-red-500' 
+                      : trafficStatus.status === 'warning' 
+                        ? 'text-yellow-600' 
+                        : 'text-[var(--muted-foreground)]'
+                  }`}>
                     {trafficStatus.status === 'danger' ? '⚠️ 已超限' : trafficStatus.status === 'warning' ? '⚠️ 接近上限' : '剩余'}
                   </span>
                   <span className={`text-[10px] font-medium ${
