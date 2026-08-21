@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ServerCard } from '@/components/dashboard/server-card';
 import { ServerDetail } from '@/components/dashboard/server-detail';
+import { TrafficSettingsDialog } from '@/components/dashboard/traffic-settings-dialog';
 import { Activity, Server as ServerIcon, RefreshCw, Plus, X } from 'lucide-react';
 
 interface ServerData {
@@ -16,6 +17,11 @@ interface ServerData {
   lastSeen: number;
   remark?: string;
   latency?: number | null;
+  trafficLimitGB?: number | null;
+  trafficMode?: 'down' | 'both' | null;
+  trafficResetDay?: number;
+  currentPeriodRx?: number;
+  currentPeriodTx?: number;
   latest: {
     cpuUsage: number;
     memoryUsage: number;
@@ -34,6 +40,13 @@ export default function DashboardPage() {
   const [selectedServer, setSelectedServer] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [trafficSettingsServer, setTrafficSettingsServer] = useState<{
+    id: string;
+    name: string;
+    trafficLimitGB: number;
+    trafficMode: 'down' | 'both';
+    trafficResetDay: number;
+  } | null>(null);
   const [latencies, setLatencies] = useState<Record<string, number | null>>({});
 
   const fetchServers = useCallback(async () => {
@@ -97,6 +110,25 @@ export default function DashboardPage() {
       );
     } catch (err) {
       console.error('Update remark error:', err);
+    }
+  };
+
+  const handleUpdateTrafficSettings = async (
+    serverId: string,
+    trafficLimitGB: number,
+    trafficMode: 'down' | 'both'
+  ) => {
+    try {
+      const res = await fetch(`/api/servers/${serverId}/traffic`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trafficLimitGB, trafficMode }),
+      });
+      if (!res.ok) throw new Error('Failed to update traffic settings');
+      fetchServers();
+      setTrafficSettingsServer(null);
+    } catch (err) {
+      console.error('Update traffic settings error:', err);
     }
   };
 
@@ -250,9 +282,21 @@ export default function DashboardPage() {
                 remark={server.remark}
                 latency={latencies[server.id]}
                 latest={server.latest}
+                trafficLimitGB={server.trafficLimitGB}
+                trafficMode={server.trafficMode ?? undefined}
                 onClick={() => setSelectedServer(server.id)}
                 onDelete={() => handleDeleteServer(server.id)}
                 onRemarkUpdate={handleUpdateRemark}
+                onTrafficSettings={(sid) => {
+                  const s = servers.find(sv => sv.id === sid);
+                  if (s) setTrafficSettingsServer({
+                    id: s.id,
+                    name: s.hostname || s.ip,
+                    trafficLimitGB: s.trafficLimitGB ?? 0,
+                    trafficMode: s.trafficMode ?? 'down',
+                    trafficResetDay: s.trafficResetDay ?? 1,
+                  });
+                }}
               />
             ))}
           </div>
@@ -262,6 +306,33 @@ export default function DashboardPage() {
       {/* Add Server Modal */}
       {showAddModal && (
         <AddServerModal onClose={() => setShowAddModal(false)} onAdded={fetchServers} />
+      )}
+
+      {/* Traffic Settings Dialog */}
+      {trafficSettingsServer && (
+        <TrafficSettingsDialog
+          isOpen={!!trafficSettingsServer}
+          onClose={() => setTrafficSettingsServer(null)}
+          serverId={trafficSettingsServer.id}
+          serverName={trafficSettingsServer.name || trafficSettingsServer.id}
+          trafficLimitGB={trafficSettingsServer.trafficLimitGB}
+          trafficMode={trafficSettingsServer.trafficMode || 'both'}
+          trafficResetDay={trafficSettingsServer.trafficResetDay || 1}
+          onSave={async (settings) => {
+            if (!trafficSettingsServer) return;
+            try {
+              await fetch(`/api/servers/${trafficSettingsServer.id}/traffic`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(settings),
+              });
+              setTrafficSettingsServer(null);
+              fetchServers();
+            } catch (error) {
+              console.error('保存流量设置失败:', error);
+            }
+          }}
+        />
       )}
     </div>
   );

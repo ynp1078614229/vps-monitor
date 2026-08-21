@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { StatusIndicator } from './status-indicator';
-import { Trash2, Pencil, Check, X } from 'lucide-react';
+import { Trash2, Pencil, Check, X, Settings } from 'lucide-react';
 
 interface ServerCardProps {
   id: string;
@@ -15,6 +15,9 @@ interface ServerCardProps {
   lastSeen: number;
   remark?: string;
   latency?: number | null;
+  trafficLimitGB?: number | null;
+  trafficMode?: 'down' | 'both';
+  trafficResetDay?: number;
   latest: {
     cpuUsage: number;
     memoryUsage: number;
@@ -28,6 +31,7 @@ interface ServerCardProps {
   onClick: () => void;
   onDelete: () => void;
   onRemarkUpdate?: (id: string, remark: string) => void;
+  onTrafficSettings?: (id: string) => void;
 }
 
 function formatKB(bytesPerSec: number): string {
@@ -70,6 +74,32 @@ function timeAgo(timestamp: number): string {
   return `${days}天前`;
 }
 
+// Calculate traffic usage percentage and status
+function getTrafficStatus(
+  totalRxBytes: number,
+  totalTxBytes: number,
+  trafficLimitGB: number | null | undefined,
+  trafficMode: 'down' | 'both' | undefined
+): { percentage: number; status: 'normal' | 'warning' | 'danger' } {
+  if (!trafficLimitGB || trafficLimitGB <= 0) {
+    return { percentage: 0, status: 'normal' };
+  }
+  
+  const usedBytes = trafficMode === 'down' 
+    ? totalRxBytes 
+    : totalRxBytes + totalTxBytes;
+  
+  const limitBytes = trafficLimitGB * 1024 * 1024 * 1024;
+  const percentage = (usedBytes / limitBytes) * 100;
+  
+  if (percentage >= 100) {
+    return { percentage, status: 'danger' };
+  } else if (percentage >= 80) {
+    return { percentage, status: 'warning' };
+  }
+  return { percentage, status: 'normal' };
+}
+
 export function ServerCard({
   id,
   hostname,
@@ -78,13 +108,39 @@ export function ServerCard({
   lastSeen,
   remark,
   latency,
+  trafficLimitGB,
+  trafficMode,
+  trafficResetDay,
   latest,
   onClick,
   onDelete,
   onRemarkUpdate,
+  onTrafficSettings,
 }: ServerCardProps) {
   const [isEditingRemark, setIsEditingRemark] = useState(false);
   const [editRemarkValue, setEditRemarkValue] = useState(remark || '');
+
+  // Calculate traffic status
+  const trafficStatus = getTrafficStatus(
+    latest?.totalRxBytes || 0,
+    latest?.totalTxBytes || 0,
+    trafficLimitGB,
+    trafficMode
+  );
+
+  // Determine card border color based on traffic status
+  const getTrafficBorderColor = () => {
+    if (trafficStatus.status === 'danger') return 'border-red-500 border-2';
+    if (trafficStatus.status === 'warning') return 'border-yellow-500 border-2';
+    return 'border-[var(--border)]';
+  };
+
+  // Determine card background based on traffic status
+  const getTrafficBgColor = () => {
+    if (trafficStatus.status === 'danger') return 'bg-red-50/30';
+    if (trafficStatus.status === 'warning') return 'bg-yellow-50/30';
+    return 'bg-[var(--card)]';
+  };
 
   const handleSaveRemark = () => {
     if (onRemarkUpdate) {
@@ -101,7 +157,7 @@ export function ServerCard({
   return (
     <div
       onClick={onClick}
-      className="card-hover bg-[var(--card)] border border-[var(--border)] rounded-lg p-3 cursor-pointer transition-all duration-200 relative group"
+      className={`card-hover ${getTrafficBgColor()} ${getTrafficBorderColor()} rounded-lg p-3 cursor-pointer transition-all duration-200 relative group`}
     >
       {/* Delete button */}
       <button
@@ -276,6 +332,63 @@ export function ServerCard({
                 </p>
               </div>
             </div>
+            {/* Traffic warning */}
+            {trafficLimitGB && trafficLimitGB > 0 && (
+              <div className={`pt-1 mt-1 border-t border-dashed border-[var(--border)]`}>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] text-[var(--muted-foreground)]">
+                    流量 {trafficMode === 'down' ? '(仅下行)' : '(上下行)'}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className={`text-[10px] font-medium ${
+                      trafficStatus.status === 'danger' 
+                        ? 'text-red-500' 
+                        : trafficStatus.status === 'warning' 
+                          ? 'text-yellow-600' 
+                          : 'text-[var(--foreground)]'
+                    }`}>
+                      {formatBytes(trafficMode === 'down' ? latest.totalRxBytes : latest.totalRxBytes + latest.totalTxBytes)} / {trafficLimitGB}GB
+                    </span>
+                    {onTrafficSettings && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onTrafficSettings(id); }}
+                        className="p-0.5 text-[var(--muted-foreground)] hover:text-[var(--primary)]"
+                        title="设置流量"
+                      >
+                        <Settings className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="flex justify-between items-center mt-0.5">
+                  <span className="text-[10px] text-[var(--muted-foreground)]">
+                    {trafficStatus.status === 'danger' ? '⚠️ 已超限' : trafficStatus.status === 'warning' ? '⚠️ 接近上限' : '剩余'}
+                  </span>
+                  <span className={`text-[10px] font-medium ${
+                    trafficStatus.status === 'danger' 
+                      ? 'text-red-500' 
+                      : trafficStatus.status === 'warning' 
+                        ? 'text-yellow-600' 
+                        : 'text-[var(--foreground)]'
+                  }`}>
+                    {trafficStatus.percentage.toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+            )}
+            {/* No traffic limit set - show settings button */}
+            {(!trafficLimitGB || trafficLimitGB === 0) && onTrafficSettings && (
+              <div className="flex justify-end pt-1 mt-1 border-t border-dashed border-[var(--border)]">
+                <button
+                  onClick={(e) => { e.stopPropagation(); onTrafficSettings(id); }}
+                  className="flex items-center gap-1 text-[10px] text-[var(--muted-foreground)] hover:text-[var(--primary)]"
+                  title="设置流量上限"
+                >
+                  <Settings className="w-3 h-3" />
+                  <span>设置流量上限</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       ) : (
