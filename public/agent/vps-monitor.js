@@ -27,7 +27,7 @@ const CONFIG = {
   secret: process.env.AGENT_SECRET || '',
   interval: parseInt(process.env.INTERVAL || '5', 10) * 1000,
   serverId: process.env.SERVER_ID || os.hostname(),
-  version: '1.0.0',
+  version: '2.0.0',
 };
 
 // Validate config

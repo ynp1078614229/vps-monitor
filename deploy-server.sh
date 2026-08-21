@@ -19,6 +19,7 @@ INSTALL_DIR="/opt/vps-monitor"
 SERVICE_NAME="vps-monitor"
 PORT="${PORT:-80}"
 AGENT_SECRET="${AGENT_SECRET:-vps-monitor-default-secret}"
+SERVER_PUBLIC_URL="${SERVER_PUBLIC_URL:-}"
 
 # 打印信息
 info() { echo -e "${BLUE}[INFO]${NC} $1"; }
@@ -244,13 +245,15 @@ setup_firewall() {
 # 显示完成信息
 show_info() {
     IP=$(curl -s ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
+    # 如果有自定义 URL 则使用，否则自动拼接
+    DISPLAY_URL="${SERVER_PUBLIC_URL:-http://${IP}:${PORT}}"
     
     echo ""
     echo "=========================================="
     echo -e "${GREEN}VPS 监控面板部署完成!${NC}"
     echo "=========================================="
     echo ""
-    echo "  访问地址: http://${IP}:${PORT}"
+    echo "  访问地址: ${DISPLAY_URL}"
     echo "  Agent 密钥: ${AGENT_SECRET}"
     echo ""
     echo "  管理命令:"
@@ -258,8 +261,8 @@ show_info() {
     echo "    systemctl restart ${SERVICE_NAME}  # 重启服务"
     echo "    journalctl -u ${SERVICE_NAME} -f   # 查看日志"
     echo ""
-    echo "  Agent 部署命令:"
-    echo "    curl -sSL https://raw.githubusercontent.com/YOUR_USERNAME/vps-monitor/main/deploy-agent.sh | bash -s -- --server http://${IP}:${PORT} --secret ${AGENT_SECRET}"
+    echo "  Agent 一键部署:"
+    echo "    curl -sSL https://raw.githubusercontent.com/ynp1078614229/vps-monitor/main/deploy-agent.sh | bash -s -- --server ${DISPLAY_URL} --secret ${AGENT_SECRET}"
     echo ""
     echo "=========================================="
 }
