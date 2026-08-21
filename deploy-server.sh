@@ -15,9 +15,9 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 # 配置
-INSTALL_DIR="/opt/vps-monitor"
-SERVICE_NAME="vps-monitor"
 PORT="${PORT:-80}"
+INSTALL_DIR="/opt/vps-monitor-${PORT}"
+SERVICE_NAME="vps-monitor-${PORT}"
 AGENT_SECRET="${AGENT_SECRET:-vps-monitor-default-secret}"
 
 # 打印信息
