@@ -110,3 +110,117 @@ echo "访问地址: http://$(curl -s ifconfig.me 2>/dev/null || hostname -I | aw
 echo "服务名称: ${SERVICE_NAME}"
 echo "管理命令: systemctl {start|stop|restart|status} ${SERVICE_NAME}"
 echo "=========================================="
+
+# 卸载函数
+uninstall() {
+  local name="$1"
+  if [ -z "$name" ]; then
+    echo "用法: $0 --uninstall <实例名称>"
+    echo ""
+    echo "已安装的实例:"
+    for service in $(systemctl list-units --type=service --no-legend | grep "vps-monitor-" | awk '{print $1}'); do
+      local iname=$(echo "$service" | sed 's/vps-monitor-//' | sed 's/\.service//')
+      local port=$(systemctl show "$service" -p Environment --value 2>/dev/null | grep -oP 'PORT=\K[0-9]+' || echo "?")
+      local status=$(systemctl is-active "$service" 2>/dev/null || echo "inactive")
+      echo "  - $iname (端口: $port, 状态: $status)"
+    done
+    echo ""
+    echo "示例: $0 --uninstall panel-a"
+    exit 0
+  fi
+
+  local service_name="vps-monitor-${name}.service"
+  local install_dir="/opt/vps-monitor/${name}"
+
+  echo "=========================================="
+  echo "卸载实例: $name"
+  echo "=========================================="
+
+  if ! systemctl list-unit-files "$service_name" &>/dev/null; then
+    echo "[ERROR] 实例 $name 不存在"
+    exit 1
+  fi
+
+  read -p "确认卸载实例 $name ? [y/N]: " confirm
+  if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+    echo "已取消"
+    exit 0
+  fi
+
+  echo "[INFO] 停止服务..."
+  systemctl stop "$service_name" 2>/dev/null || true
+  echo "[INFO] 禁用服务..."
+  systemctl disable "$service_name" 2>/dev/null || true
+  echo "[INFO] 删除服务文件..."
+  rm -f "/etc/systemd/system/$service_name"
+  echo "[INFO] 删除安装目录..."
+  rm -rf "$install_dir"
+  echo "[INFO] 重新加载 systemd..."
+  systemctl daemon-reload
+
+  # 删除防火墙规则
+  if command -v ufw &>/dev/null && ufw status | grep -q "active"; then
+    local port=$(systemctl show "vps-monitor-${name}.service" -p Environment --value 2>/dev/null | grep -oP 'PORT=\K[0-9]+' || true)
+    if [ -n "$port" ]; then
+      echo "[INFO] 删除防火墙规则 (端口 $port)..."
+      ufw delete allow "$port" 2>/dev/null || true
+    fi
+  fi
+
+  echo "[OK] 实例 $name 卸载完成"
+}
+
+# 主菜单
+main_menu() {
+  echo "=========================================="
+  echo "VPS 监控面板 - 管理菜单"
+  echo "=========================================="
+  echo ""
+  echo "  1) 安装新实例"
+  echo "  2) 卸载实例"
+  echo "  3) 查看已安装实例"
+  echo "  4) 退出"
+  echo ""
+  read -p "请选择 [1-4]: " choice
+
+  case $choice in
+    1)
+      read -p "实例名称 (默认: vps-monitor): " name
+      read -p "监听端口 (默认: 80): " port
+      read -p "认证密钥 (默认: vps-monitor-default-secret): " secret
+      [ -z "$name" ] && name="vps-monitor"
+      [ -z "$port" ] && port="80"
+      [ -z "$secret" ] && secret="vps-monitor-default-secret"
+      echo ""
+      # 递归调用自己进行安装
+      exec "$0" --name "$name" --port "$port" --secret "$secret"
+      ;;
+    2)
+      uninstall
+      read -p "请输入要卸载的实例名称: " name
+      [ -n "$name" ] && uninstall "$name"
+      ;;
+    3)
+      uninstall
+      ;;
+    4)
+      exit 0
+      ;;
+    *)
+      echo "无效选择"
+      exit 1
+      ;;
+  esac
+}
+
+# 处理卸载参数
+if [ "$1" = "--uninstall" ] || [ "$1" = "-u" ]; then
+  uninstall "$2"
+  exit 0
+fi
+
+# 无参数时进入菜单
+if [ $# -eq 0 ]; then
+  main_menu
+  exit 0
+fi
