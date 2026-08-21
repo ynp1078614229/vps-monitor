@@ -68,6 +68,14 @@ const AGENT_SECRET = process.env.AGENT_SECRET || 'vps-monitor-default-secret';
 let servers = new Map<string, ServerData>();
 let saveTimeout: NodeJS.Timeout | null = null;
 
+// Orphaned traffic data: preserved when server is deleted, restored when agent re-reports
+// Key: serverId, Value: traffic-related fields from ServerInfo
+let orphanedTraffic = new Map<string, Pick<ServerInfo, 
+  'trafficLimitGB' | 'trafficMode' | 'trafficResetDay' | 
+  'trafficPeriodStart' | 'trafficBaselineRx' | 'trafficBaselineTx' | 
+  'trafficPeriodRx' | 'trafficPeriodTx'
+>>();
+
 /**
  * Load data from file into memory
  */
@@ -75,12 +83,22 @@ function loadFromDisk(): void {
   try {
     if (fs.existsSync(STORE_FILE)) {
       const raw = fs.readFileSync(STORE_FILE, 'utf-8');
-      const data = JSON.parse(raw);
-      servers = new Map(Object.entries(data));
+      const parsed = JSON.parse(raw);
+      
+      // Support new format: { servers: {...}, orphanedTraffic: {...} }
+      if (parsed.servers && typeof parsed.servers === 'object') {
+        servers = new Map(Object.entries(parsed.servers));
+        orphanedTraffic = new Map(Object.entries(parsed.orphanedTraffic || {}));
+      } else {
+        // Legacy format: plain object of servers
+        servers = new Map(Object.entries(parsed));
+        orphanedTraffic = new Map();
+      }
     }
   } catch (err) {
     console.error('Failed to load store from disk:', err);
     servers = new Map();
+    orphanedTraffic = new Map();
   }
 }
 
@@ -91,7 +109,10 @@ function saveToDisk(): void {
   if (saveTimeout) clearTimeout(saveTimeout);
   saveTimeout = setTimeout(() => {
     try {
-      const obj = Object.fromEntries(servers);
+      const obj = {
+        servers: Object.fromEntries(servers),
+        orphanedTraffic: Object.fromEntries(orphanedTraffic),
+      };
       fs.writeFileSync(STORE_FILE, JSON.stringify(obj), 'utf-8');
     } catch (err) {
       console.error('Failed to save store to disk:', err);
@@ -124,8 +145,18 @@ export function upsertServer(info: ServerInfo, metrics: MetricsRecord): ServerDa
   let data = servers.get(info.id);
 
   if (!data) {
+    // Restore orphaned traffic data if available (server was deleted and agent re-reports)
+    const orphaned = orphanedTraffic.get(info.id);
+    const restoredInfo = orphaned 
+      ? { ...info, firstSeen: Date.now(), lastSeen: Date.now(), ...orphaned }
+      : { ...info, firstSeen: Date.now(), lastSeen: Date.now() };
+    
+    if (orphaned) {
+      orphanedTraffic.delete(info.id);
+    }
+    
     data = {
-      info: { ...info, firstSeen: Date.now(), lastSeen: Date.now() },
+      info: restoredInfo,
       metrics: [],
       latest: null,
     };
@@ -162,9 +193,27 @@ export function getMetricsHistory(
 
 export function removeServer(id: string): boolean {
   loadFromDisk();
-  const result = servers.delete(id);
+  const data = servers.get(id);
+  if (!data) return false;
+  
+  // Preserve traffic-related data before deleting
+  const info = data.info;
+  if (info.trafficLimitGB || info.trafficPeriodStart || info.trafficBaselineRx) {
+    orphanedTraffic.set(id, {
+      trafficLimitGB: info.trafficLimitGB,
+      trafficMode: info.trafficMode,
+      trafficResetDay: info.trafficResetDay,
+      trafficPeriodStart: info.trafficPeriodStart,
+      trafficBaselineRx: info.trafficBaselineRx,
+      trafficBaselineTx: info.trafficBaselineTx,
+      trafficPeriodRx: info.trafficPeriodRx,
+      trafficPeriodTx: info.trafficPeriodTx,
+    });
+  }
+  
+  servers.delete(id);
   saveToDisk();
-  return result;
+  return true;
 }
 
 export function updateServerRemark(id: string, remark: string): boolean {
