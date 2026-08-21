@@ -26,6 +26,35 @@ success() { echo -e "${GREEN}[OK]${NC} $1"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
+# 交互式配置
+interactive_config() {
+    # 如果是交互式终端，询问用户
+    if [ -t 0 ] && [ -z "$PORT_OVERRIDE" ]; then
+        echo ""
+        echo "=========================================="
+        echo "  VPS 监控面板 - 部署配置"
+        echo "=========================================="
+        echo ""
+
+        # 询问端口
+        read -p "请输入监控面板端口 [默认: 80]: " input_port
+        if [ -n "$input_port" ]; then
+            PORT="$input_port"
+        fi
+
+        # 询问认证密钥
+        read -p "请输入 Agent 认证密钥 [默认: vps-monitor-default-secret]: " input_secret
+        if [ -n "$input_secret" ]; then
+            AGENT_SECRET="$input_secret"
+        fi
+
+        echo ""
+        info "端口: $PORT"
+        info "认证密钥: $AGENT_SECRET"
+        echo ""
+    fi
+}
+
 # 检查 root 权限
 check_root() {
     if [ "$EUID" -ne 0 ]; then
@@ -244,6 +273,7 @@ main() {
     echo ""
 
     check_root
+    interactive_config
     detect_os
     install_nodejs
     install_pnpm
