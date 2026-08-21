@@ -15,6 +15,7 @@ interface ServerData {
   online: boolean;
   lastSeen: number;
   remark?: string;
+  latency?: number | null;
   latest: {
     cpuUsage: number;
     memoryUsage: number;
@@ -33,6 +34,7 @@ export default function DashboardPage() {
   const [selectedServer, setSelectedServer] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [latencies, setLatencies] = useState<Record<string, number | null>>({});
 
   const fetchServers = useCallback(async () => {
     try {
@@ -47,6 +49,29 @@ export default function DashboardPage() {
       setLoading(false);
     }
   }, []);
+
+  const fetchLatencies = useCallback(async () => {
+    const currentServers = servers;
+    if (currentServers.length === 0) return;
+
+    const results: Record<string, number | null> = {};
+    await Promise.all(
+      currentServers.map(async (server) => {
+        try {
+          const res = await fetch(`/api/ping?ip=${encodeURIComponent(server.ip)}`);
+          if (res.ok) {
+            const data = await res.json();
+            results[server.id] = data.latency;
+          } else {
+            results[server.id] = null;
+          }
+        } catch {
+          results[server.id] = null;
+        }
+      })
+    );
+    setLatencies(results);
+  }, [servers]);
 
   const handleDeleteServer = async (serverId: string) => {
     if (!confirm('确定要删除此服务器吗？所有监控数据将被清除。')) return;
@@ -77,9 +102,17 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchServers();
-    const interval = setInterval(fetchServers, 5_000);
-    return () => clearInterval(interval);
+    const serverInterval = setInterval(fetchServers, 5_000);
+    return () => clearInterval(serverInterval);
   }, [fetchServers]);
+
+  useEffect(() => {
+    if (servers.length > 0) {
+      fetchLatencies();
+      const pingInterval = setInterval(fetchLatencies, 30_000);
+      return () => clearInterval(pingInterval);
+    }
+  }, [servers, fetchLatencies]);
 
   const onlineCount = servers.filter((s) => s.online).length;
   const offlineCount = servers.length - onlineCount;
@@ -215,6 +248,7 @@ export default function DashboardPage() {
                 online={server.online}
                 lastSeen={server.lastSeen}
                 remark={server.remark}
+                latency={latencies[server.id]}
                 latest={server.latest}
                 onClick={() => setSelectedServer(server.id)}
                 onDelete={() => handleDeleteServer(server.id)}

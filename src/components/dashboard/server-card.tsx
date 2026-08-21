@@ -14,6 +14,7 @@ interface ServerCardProps {
   online: boolean;
   lastSeen: number;
   remark?: string;
+  latency?: number | null;
   latest: {
     cpuUsage: number;
     memoryUsage: number;
@@ -76,6 +77,7 @@ export function ServerCard({
   online,
   lastSeen,
   remark,
+  latency,
   latest,
   onClick,
   onDelete,
@@ -126,13 +128,29 @@ export function ServerCard({
             </p>
           </div>
         </div>
-        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
-          online
-            ? 'bg-green-50 text-[var(--status-online)]'
-            : 'bg-red-50 text-[var(--status-offline)]'
-        }`}>
-          {online ? '在线' : '离线'}
-        </span>
+        <div className="flex items-center gap-1.5">
+          {online && latency !== null && latency !== undefined && (
+            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full ${
+              latency < 50 ? 'bg-green-50 text-[var(--status-online)]' :
+              latency < 100 ? 'bg-yellow-50 text-[var(--status-warning)]' :
+              'bg-red-50 text-[var(--status-offline)]'
+            }`}>
+              {latency.toFixed(0)}ms
+            </span>
+          )}
+          {online && (latency === null || latency === undefined) && (
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-gray-50 text-[var(--muted-foreground)]">
+              ...
+            </span>
+          )}
+          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+            online
+              ? 'bg-green-50 text-[var(--status-online)]'
+              : 'bg-red-50 text-[var(--status-offline)]'
+          }`}>
+            {online ? '在线' : '离线'}
+          </span>
+        </div>
       </div>
 
       {/* 备注 */}
