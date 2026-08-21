@@ -18,6 +18,8 @@ interface ServerCardProps {
   trafficLimitGB?: number | null;
   trafficMode?: 'down' | 'both';
   trafficResetDay?: number;
+  trafficPeriodRx?: number;
+  trafficPeriodTx?: number;
   latest: {
     cpuUsage: number;
     memoryUsage: number;
@@ -111,6 +113,8 @@ export function ServerCard({
   trafficLimitGB,
   trafficMode,
   trafficResetDay,
+  trafficPeriodRx,
+  trafficPeriodTx,
   latest,
   onClick,
   onDelete,
@@ -120,10 +124,14 @@ export function ServerCard({
   const [isEditingRemark, setIsEditingRemark] = useState(false);
   const [editRemarkValue, setEditRemarkValue] = useState(remark || '');
 
-  // Calculate traffic status
+  // Calculate traffic status using period-based values (from store)
+  // Fall back to absolute totalRx/totalTx if period values not available
+  const usedRx = trafficPeriodRx && trafficPeriodRx > 0 ? trafficPeriodRx : (latest?.totalRxBytes || 0);
+  const usedTx = trafficPeriodTx && trafficPeriodTx > 0 ? trafficPeriodTx : (latest?.totalTxBytes || 0);
+  
   const trafficStatus = getTrafficStatus(
-    latest?.totalRxBytes || 0,
-    latest?.totalTxBytes || 0,
+    usedRx,
+    usedTx,
     trafficLimitGB,
     trafficMode
   );
@@ -347,7 +355,7 @@ export function ServerCard({
                           ? 'text-yellow-600' 
                           : 'text-[var(--foreground)]'
                     }`}>
-                      {formatBytes(trafficMode === 'down' ? latest.totalRxBytes : latest.totalRxBytes + latest.totalTxBytes)} / {trafficLimitGB}GB
+                      {formatBytes(trafficMode === 'both' ? usedRx + usedTx : usedRx)} / {trafficLimitGB}GB
                     </span>
                     {onTrafficSettings && (
                       <button

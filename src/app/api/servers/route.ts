@@ -17,6 +17,11 @@ export async function GET() {
       lastSeen: data.info.lastSeen,
       online: isServerOnline(data),
       remark: data.info.remark || '',
+      trafficLimitGB: data.info.trafficLimitGB || 0,
+      trafficMode: data.info.trafficMode || 'down',
+      trafficResetDay: data.info.trafficResetDay || 1,
+      trafficPeriodRx: data.info.trafficPeriodRx || 0,
+      trafficPeriodTx: data.info.trafficPeriodTx || 0,
       latest: data.latest,
     }));
 

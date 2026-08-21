@@ -20,8 +20,8 @@ interface ServerData {
   trafficLimitGB?: number | null;
   trafficMode?: 'down' | 'both' | null;
   trafficResetDay?: number;
-  currentPeriodRx?: number;
-  currentPeriodTx?: number;
+  trafficPeriodRx?: number;
+  trafficPeriodTx?: number;
   latest: {
     cpuUsage: number;
     memoryUsage: number;
@@ -283,7 +283,10 @@ export default function DashboardPage() {
                 latency={latencies[server.id]}
                 latest={server.latest}
                 trafficLimitGB={server.trafficLimitGB}
-                trafficMode={server.trafficMode ?? undefined}
+                trafficMode={server.trafficMode ?? 'down'}
+                trafficResetDay={server.trafficResetDay ?? 1}
+                trafficPeriodRx={server.trafficPeriodRx}
+                trafficPeriodTx={server.trafficPeriodTx}
                 onClick={() => setSelectedServer(server.id)}
                 onDelete={() => handleDeleteServer(server.id)}
                 onRemarkUpdate={handleUpdateRemark}

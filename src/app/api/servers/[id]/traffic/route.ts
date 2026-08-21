@@ -60,9 +60,9 @@ export async function POST(
     }
     
     const success = updateTrafficSettings(id, {
-      trafficLimitGB: trafficLimitGB || undefined,
+      trafficLimitGB: trafficLimitGB !== undefined && trafficLimitGB !== null ? trafficLimitGB : undefined,
       trafficMode: trafficMode || undefined,
-      trafficResetDay: trafficResetDay || undefined,
+      trafficResetDay: trafficResetDay !== undefined && trafficResetDay !== null ? trafficResetDay : undefined,
     });
     
     if (!success) {

@@ -25,6 +25,8 @@ export interface ServerInfo {
   trafficMode?: 'down' | 'both'; // 'down' 只算下行，'both' 算上下行
   trafficResetDay?: number; // 每月重置日期 (1-28)，默认 1
   trafficPeriodStart?: number; // 当前计费周期开始时间 (timestamp ms)
+  trafficBaselineRx?: number; // 周期开始时的 agent totalRx (baseline for delta)
+  trafficBaselineTx?: number; // 周期开始时的 agent totalTx (baseline for delta)
   trafficPeriodRx?: number; // 当前周期累计下行 (bytes)
   trafficPeriodTx?: number; // 当前周期累计上行 (bytes)
 }
@@ -247,45 +249,61 @@ export function getTrafficUsage(id: string): {
 /**
  * Update cumulative traffic for a server
  * Called when agent reports new metrics
+ * 
+ * Agent reports totalRx/totalTx as absolute values since system boot.
+ * We need to track the delta within the current billing period.
+ * Strategy: store a baseline (first seen values in this period) and
+ * compute period usage as (current - baseline).
  */
 export function updateTraffic(id: string, totalRx: number, totalTx: number): void {
   const data = servers.get(id);
   if (!data) return;
   
+  // We store baseline values to compute deltas
+  // trafficBaselineRx/Tx: the agent's totalRx/Tx at period start
+  // trafficPeriodRx/Tx: the computed usage within this period (delta)
+  const info = data.info;
+  
   // Initialize period tracking if not set
-  if (!data.info.trafficPeriodStart) {
-    data.info.trafficPeriodStart = Date.now();
-    data.info.trafficPeriodRx = 0;
-    data.info.trafficPeriodTx = 0;
+  if (!info.trafficPeriodStart) {
+    info.trafficPeriodStart = Date.now();
+    info.trafficBaselineRx = totalRx;
+    info.trafficBaselineTx = totalTx;
+    info.trafficPeriodRx = 0;
+    info.trafficPeriodTx = 0;
   }
   
   // Check if we need to reset the period (monthly reset)
   const now = new Date();
-  const periodStart = new Date(data.info.trafficPeriodStart);
-  const resetDay = data.info.trafficResetDay || 1;
+  const periodStart = new Date(info.trafficPeriodStart);
+  const resetDay = info.trafficResetDay || 1;
   
   // Check if current month's reset day has passed since last period start
   const currentResetDate = new Date(now.getFullYear(), now.getMonth(), resetDay);
   if (currentResetDate > periodStart && now >= currentResetDate) {
-    // Reset the period
-    data.info.trafficPeriodStart = currentResetDate.getTime();
-    data.info.trafficPeriodRx = 0;
-    data.info.trafficPeriodTx = 0;
+    // Reset the period - current values become new baseline
+    info.trafficPeriodStart = currentResetDate.getTime();
+    info.trafficBaselineRx = totalRx;
+    info.trafficBaselineTx = totalTx;
+    info.trafficPeriodRx = 0;
+    info.trafficPeriodTx = 0;
+    return;
   }
   
-  // Update cumulative traffic (store the delta from the period start)
-  // We use the totalRx/totalTx from agent as absolute values since system boot
-  // For simplicity, we track the difference from when we started monitoring
-  if (data.info.trafficPeriodRx === 0 && data.info.trafficPeriodTx === 0) {
-    // First report, use as baseline
-    data.info.trafficPeriodRx = totalRx;
-    data.info.trafficPeriodTx = totalTx;
+  // Compute delta from baseline
+  // Handle server reboot: if current < baseline, values reset, use current as new baseline
+  const baselineRx = info.trafficBaselineRx || 0;
+  const baselineTx = info.trafficBaselineTx || 0;
+  
+  if (totalRx < baselineRx || totalTx < baselineTx) {
+    // Server rebooted, agent values reset - use current as new baseline
+    info.trafficBaselineRx = totalRx;
+    info.trafficBaselineTx = totalTx;
+    info.trafficPeriodRx = 0;
+    info.trafficPeriodTx = 0;
   } else {
-    // Calculate delta and add to period totals
-    // Note: This assumes the agent's totalRx/totalTx are monotonically increasing
-    // If the server reboots, the agent's values reset, so we need to handle that
-    data.info.trafficPeriodRx = totalRx;
-    data.info.trafficPeriodTx = totalTx;
+    info.trafficPeriodRx = totalRx - baselineRx;
+    info.trafficPeriodTx = totalTx - baselineTx;
   }
 }
 
