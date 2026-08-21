@@ -38,21 +38,37 @@
 
 ### 1️⃣ 部署监控面板（中央服务器）
 
+**支持多实例运行**：每个实例使用独立端口，互不干扰。
+
+**方式一：参数模式（适合测试/自动化）**
 ```bash
-# 一键部署（交互式配置端口和密钥）
-curl -sSL https://raw.githubusercontent.com/ynp1078614229/vps-monitor/main/deploy-server.sh | bash
-
-# 自定义端口和密钥
+# 部署到端口 8080，密钥 my-secret
 PORT=8080 AGENT_SECRET=my-secret bash -c "$(curl -sSL https://raw.githubusercontent.com/ynp1078614229/vps-monitor/main/deploy-server.sh)"
+
+# 再部署一个到端口 9000
+PORT=9000 AGENT_SECRET=another-secret bash -c "$(curl -sSL https://raw.githubusercontent.com/ynp1078614229/vps-monitor/main/deploy-server.sh)"
 ```
 
-部署完成后会显示：
+**方式二：交互模式（适合首次部署）**
+```bash
+# 下载脚本后运行，会提示输入端口和密钥
+curl -sSL -o deploy-server.sh https://raw.githubusercontent.com/ynp1078614229/vps-monitor/main/deploy-server.sh
+chmod +x deploy-server.sh
+./deploy-server.sh
 ```
-==========================================
-VPS 监控面板部署完成!
-==========================================
-  访问地址: http://your-server-ip:80
-  Agent 密钥: your-secret
+
+**多实例管理**：
+```bash
+# 查看所有实例
+systemctl list-units --type=service | grep vps-monitor
+
+# 管理特定端口的实例
+systemctl status vps-monitor-8080    # 查看状态
+systemctl restart vps-monitor-8080   # 重启
+systemctl stop vps-monitor-8080      # 停止
+
+# 查看日志
+journalctl -u vps-monitor-8080 -f
 ```
 
 ### 2️⃣ 部署 Agent（被监控服务器）
