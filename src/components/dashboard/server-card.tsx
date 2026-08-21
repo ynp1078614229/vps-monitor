@@ -65,17 +65,6 @@ function getUsageBgColor(usage: number): string {
   return 'bg-[var(--status-online)]';
 }
 
-function timeAgo(timestamp: number): string {
-  const seconds = Math.floor((Date.now() - timestamp) / 1000);
-  if (seconds < 60) return `${seconds}秒前`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}分钟前`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}小时前`;
-  const days = Math.floor(hours / 24);
-  return `${days}天前`;
-}
-
 // Calculate traffic usage percentage and status
 function getTrafficStatus(
   totalRxBytes: number,
@@ -260,22 +249,22 @@ export function ServerCard({
         </div>
       )}
 
-      {/* Metrics */}
-      {online && latest ? (
+      {/* Metrics - always show; offline shows 0 for real-time, keep traffic from history */}
+      {latest ? (
         <div className="space-y-1.5">
           {/* CPU */}
           <div>
             <div className="flex justify-between items-center mb-0.5">
               <span className="text-[10px] text-[var(--muted-foreground)]">CPU</span>
-              <span className={`metric-value text-xs ${getUsageColor(latest.cpuUsage)}`}>
-                {latest.cpuUsage.toFixed(1)}
+              <span className={`metric-value text-xs ${online ? getUsageColor(latest.cpuUsage) : 'text-[var(--muted-foreground)]'}`}>
+                {online ? latest.cpuUsage.toFixed(1) : '0.0'}
                 <span className="metric-unit">%</span>
               </span>
             </div>
             <div className="h-1 bg-[var(--muted)] rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all duration-500 ${getUsageBgColor(latest.cpuUsage)}`}
-                style={{ width: `${Math.min(100, latest.cpuUsage)}%` }}
+                className={`h-full rounded-full transition-all duration-500 ${online ? getUsageBgColor(latest.cpuUsage) : 'bg-[var(--muted)]'}`}
+                style={{ width: `${online ? Math.min(100, latest.cpuUsage) : 0}%` }}
               />
             </div>
           </div>
@@ -284,15 +273,15 @@ export function ServerCard({
           <div>
             <div className="flex justify-between items-center mb-0.5">
               <span className="text-[10px] text-[var(--muted-foreground)]">内存</span>
-              <span className={`metric-value text-xs ${getUsageColor(latest.memoryUsage)}`}>
-                {latest.memoryUsage.toFixed(1)}
+              <span className={`metric-value text-xs ${online ? getUsageColor(latest.memoryUsage) : 'text-[var(--muted-foreground)]'}`}>
+                {online ? latest.memoryUsage.toFixed(1) : '0.0'}
                 <span className="metric-unit">%</span>
               </span>
             </div>
             <div className="h-1 bg-[var(--muted)] rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all duration-500 ${getUsageBgColor(latest.memoryUsage)}`}
-                style={{ width: `${Math.min(100, latest.memoryUsage)}%` }}
+                className={`h-full rounded-full transition-all duration-500 ${online ? getUsageBgColor(latest.memoryUsage) : 'bg-[var(--muted)]'}`}
+                style={{ width: `${online ? Math.min(100, latest.memoryUsage) : 0}%` }}
               />
             </div>
           </div>
@@ -302,26 +291,30 @@ export function ServerCard({
             <div className="flex gap-2">
               <div className="flex-1">
                 <div className="flex items-center gap-1">
-                  <span className="relative flex h-1 w-1">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--chart-4)] opacity-75" />
-                    <span className="relative inline-flex rounded-full h-1 w-1 bg-[var(--chart-4)]" />
-                  </span>
+                  {online && (
+                    <span className="relative flex h-1 w-1">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--chart-4)] opacity-75" />
+                      <span className="relative inline-flex rounded-full h-1 w-1 bg-[var(--chart-4)]" />
+                    </span>
+                  )}
                   <span className="text-[10px] text-[var(--muted-foreground)]">↑</span>
                 </div>
-                <p className="metric-value text-[10px] text-[var(--chart-4)]">
-                  {formatKB(latest.networkTxBytes)}<span className="metric-unit">/s</span>
+                <p className={`metric-value text-[10px] ${online ? 'text-[var(--chart-4)]' : 'text-[var(--muted-foreground)]'}`}>
+                  {online ? <>{formatKB(latest.networkTxBytes)}<span className="metric-unit">/s</span></> : '0 B/s'}
                 </p>
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-1">
-                  <span className="relative flex h-1 w-1">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--chart-1)] opacity-75" />
-                    <span className="relative inline-flex rounded-full h-1 w-1 bg-[var(--chart-1)]" />
-                  </span>
+                  {online && (
+                    <span className="relative flex h-1 w-1">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--chart-1)] opacity-75" />
+                      <span className="relative inline-flex rounded-full h-1 w-1 bg-[var(--chart-1)]" />
+                    </span>
+                  )}
                   <span className="text-[10px] text-[var(--muted-foreground)]">↓</span>
                 </div>
-                <p className="metric-value text-[10px] text-[var(--chart-1)]">
-                  {formatKB(latest.networkRxBytes)}<span className="metric-unit">/s</span>
+                <p className={`metric-value text-[10px] ${online ? 'text-[var(--chart-1)]' : 'text-[var(--muted-foreground)]'}`}>
+                  {online ? <>{formatKB(latest.networkRxBytes)}<span className="metric-unit">/s</span></> : '0 B/s'}
                 </p>
               </div>
             </div>
@@ -420,7 +413,7 @@ export function ServerCard({
         </div>
       ) : (
         <div className="text-center py-2 text-[10px] text-[var(--muted-foreground)]">
-          {online ? '暂无数据' : `${timeAgo(lastSeen)}`}
+          暂无数据
         </div>
       )}
     </div>
