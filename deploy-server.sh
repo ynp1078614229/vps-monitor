@@ -130,8 +130,10 @@ install_pnpm() {
 # 下载项目（预构建版本）
 download_project() {
     if [ -d "$INSTALL_DIR" ]; then
-        warn "目录 $INSTALL_DIR 已存在，备份为 ${INSTALL_DIR}.bak"
-        mv "$INSTALL_DIR" "${INSTALL_DIR}.bak"
+        local backup_dir="${INSTALL_DIR}.bak.$(date +%Y%m%d%H%M%S)"
+        warn "目录 $INSTALL_DIR 已存在，备份为 $backup_dir"
+        rm -rf "$backup_dir"
+        mv "$INSTALL_DIR" "$backup_dir"
     fi
 
     info "正在下载预构建版本..."
