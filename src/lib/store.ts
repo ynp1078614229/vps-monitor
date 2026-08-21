@@ -1,7 +1,10 @@
 /**
- * In-memory data store for VPS monitoring metrics.
- * In production, replace with a persistent database (e.g., PostgreSQL with Drizzle ORM).
+ * File-based data store for VPS monitoring metrics.
+ * Uses JSON file for persistence across Next.js worker processes.
  */
+
+import fs from 'fs';
+import path from 'path';
 
 export interface ServerInfo {
   id: string;
@@ -52,25 +55,70 @@ export interface ServerData {
 // Max records to keep per server (about 24h at 30s interval)
 const MAX_RECORDS = 2880;
 
-// Store: serverId -> ServerData
-const servers = new Map<string, ServerData>();
+// File path for persistent storage
+const DATA_DIR = process.env.COZE_WORKSPACE_PATH || '/workspace/projects';
+const STORE_FILE = path.join(DATA_DIR, '.vps-data.json');
 
 // Shared secret for agent authentication (set via env)
 const AGENT_SECRET = process.env.AGENT_SECRET || 'vps-monitor-default-secret';
+
+// In-memory cache with file sync
+let servers = new Map<string, ServerData>();
+let saveTimeout: NodeJS.Timeout | null = null;
+
+/**
+ * Load data from file into memory
+ */
+function loadFromDisk(): void {
+  try {
+    if (fs.existsSync(STORE_FILE)) {
+      const raw = fs.readFileSync(STORE_FILE, 'utf-8');
+      const data = JSON.parse(raw);
+      servers = new Map(Object.entries(data));
+    }
+  } catch (err) {
+    console.error('Failed to load store from disk:', err);
+    servers = new Map();
+  }
+}
+
+/**
+ * Save data from memory to file (debounced)
+ */
+function saveToDisk(): void {
+  if (saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => {
+    try {
+      const obj = Object.fromEntries(servers);
+      fs.writeFileSync(STORE_FILE, JSON.stringify(obj), 'utf-8');
+    } catch (err) {
+      console.error('Failed to save store to disk:', err);
+    }
+  }, 500); // Debounce 500ms
+}
+
+// Load data on module init
+loadFromDisk();
 
 export function getAgentSecret(): string {
   return AGENT_SECRET;
 }
 
 export function getAllServers(): ServerData[] {
+  // Reload from disk to get latest data from other workers
+  loadFromDisk();
   return Array.from(servers.values());
 }
 
 export function getServer(id: string): ServerData | undefined {
+  loadFromDisk();
   return servers.get(id);
 }
 
 export function upsertServer(info: ServerInfo, metrics: MetricsRecord): ServerData {
+  // Reload to get latest state
+  loadFromDisk();
+
   let data = servers.get(info.id);
 
   if (!data) {
@@ -95,6 +143,9 @@ export function upsertServer(info: ServerInfo, metrics: MetricsRecord): ServerDa
     data.metrics = data.metrics.slice(-MAX_RECORDS);
   }
 
+  // Save to disk
+  saveToDisk();
+
   return data;
 }
 
@@ -108,13 +159,18 @@ export function getMetricsHistory(
 }
 
 export function removeServer(id: string): boolean {
-  return servers.delete(id);
+  loadFromDisk();
+  const result = servers.delete(id);
+  saveToDisk();
+  return result;
 }
 
 export function updateServerRemark(id: string, remark: string): boolean {
+  loadFromDisk();
   const data = servers.get(id);
   if (!data) return false;
   data.info.remark = remark;
+  saveToDisk();
   return true;
 }
 
@@ -125,6 +181,7 @@ export interface TrafficSettings {
 }
 
 export function updateTrafficSettings(id: string, settings: TrafficSettings): boolean {
+  loadFromDisk();
   const data = servers.get(id);
   if (!data) return false;
   
@@ -145,6 +202,7 @@ export function updateTrafficSettings(id: string, settings: TrafficSettings): bo
     data.info.trafficPeriodTx = 0;
   }
   
+  saveToDisk();
   return true;
 }
 
@@ -161,6 +219,7 @@ export function getTrafficUsage(id: string): {
   rxBytes: number;
   txBytes: number;
 } {
+  loadFromDisk();
   const data = servers.get(id);
   if (!data || !data.info.trafficLimitGB || data.info.trafficLimitGB <= 0) {
     return { usedBytes: 0, limitBytes: 0, percentage: 0, status: 'unlimited', rxBytes: 0, txBytes: 0 };
