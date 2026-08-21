@@ -15,8 +15,15 @@ export async function GET(
       return NextResponse.json({ error: 'Server not found' }, { status: 404 });
     }
 
-    const limit = 60;
-    const metrics = getMetricsHistory(id, limit);
+    const limit = 720; // 1小时 (Agent 每5秒上报, 720条 = 3600秒)
+    const rawMetrics = getMetricsHistory(id, limit);
+
+    // Downsample for chart rendering: keep ~120 points max for smooth performance
+    let metrics = rawMetrics;
+    if (rawMetrics.length > 120) {
+      const step = Math.ceil(rawMetrics.length / 120);
+      metrics = rawMetrics.filter((_, i) => i % step === 0 || i === rawMetrics.length - 1);
+    }
 
     return NextResponse.json({
       server: {

@@ -52,8 +52,8 @@ export interface ServerData {
   latest: MetricsRecord | null;
 }
 
-// Max records to keep per server (about 24h at 30s interval)
-const MAX_RECORDS = 2880;
+// Max records to keep per server (about 24h at 5s interval)
+const MAX_RECORDS = 17280;
 
 // File path for persistent storage
 const DATA_DIR = process.env.COZE_WORKSPACE_PATH || '/workspace/projects';
