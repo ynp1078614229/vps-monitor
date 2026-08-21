@@ -54,7 +54,28 @@ export default function DashboardPage() {
       const res = await fetch('/api/servers');
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
-      setServers(data.servers);
+      // 按最后上报时间降序排列（最近上报的排前面），非动态排序：仅新服务器加入时确定位置
+      setServers(prev => {
+        if (prev.length === 0) {
+          // 首次加载：按 lastSeen 降序排序
+          return [...data.servers].sort((a: ServerData, b: ServerData) => b.lastSeen - a.lastSeen);
+        }
+        // 后续刷新：保持已有顺序不变，仅将新服务器按 lastSeen 插入到合适位置
+        const existingIds = new Set(prev.map(s => s.id));
+        const newServers = data.servers.filter((s: ServerData) => !existingIds.has(s.id));
+        if (newServers.length === 0) return prev;
+        // 新服务器按 lastSeen 降序插入到已有列表中
+        const merged = [...prev];
+        for (const ns of newServers.sort((a: ServerData, b: ServerData) => b.lastSeen - a.lastSeen)) {
+          const idx = merged.findIndex(s => s.lastSeen < ns.lastSeen);
+          if (idx === -1) {
+            merged.push(ns);
+          } else {
+            merged.splice(idx, 0, ns);
+          }
+        }
+        return merged;
+      });
       setLastRefresh(new Date());
     } catch (err) {
       console.error('Fetch servers error:', err);
