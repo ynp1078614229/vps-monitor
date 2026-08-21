@@ -24,8 +24,13 @@ export async function GET() {
     }
   }
 
+  // 从环境变量或请求头获取端口
+  const port = process.env.PORT || process.env.DEPLOY_RUN_PORT || '8080';
+  const protocol = process.env.HTTPS === 'true' ? 'https' : 'http';
+
   return NextResponse.json({
     publicIp,
-    monitorUrl: `http://${publicIp}:8080`,
+    port,
+    monitorUrl: `${protocol}://${publicIp}:${port}`,
   });
 }
