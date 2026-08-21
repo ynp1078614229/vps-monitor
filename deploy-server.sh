@@ -15,9 +15,9 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 # 配置
+INSTALL_DIR="/opt/vps-monitor"
+SERVICE_NAME="vps-monitor"
 PORT="${PORT:-80}"
-INSTALL_DIR="/opt/vps-monitor-${PORT}"
-SERVICE_NAME="vps-monitor-${PORT}"
 AGENT_SECRET="${AGENT_SECRET:-vps-monitor-default-secret}"
 
 # 打印信息
@@ -130,10 +130,8 @@ install_pnpm() {
 # 下载项目（预构建版本）
 download_project() {
     if [ -d "$INSTALL_DIR" ]; then
-        local backup_dir="${INSTALL_DIR}.bak.$(date +%Y%m%d%H%M%S)"
-        warn "目录 $INSTALL_DIR 已存在，备份为 $backup_dir"
-        rm -rf "$backup_dir"
-        mv "$INSTALL_DIR" "$backup_dir"
+        warn "目录 $INSTALL_DIR 已存在，备份为 ${INSTALL_DIR}.bak"
+        mv "$INSTALL_DIR" "${INSTALL_DIR}.bak"
     fi
 
     info "正在下载预构建版本..."
