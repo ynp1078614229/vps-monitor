@@ -75,6 +75,26 @@ detect_os() {
     info "检测到系统: $OS $VER"
 }
 
+# 等待 dpkg/apt 锁释放
+wait_for_apt() {
+    local max_wait=120
+    local waited=0
+    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do
+        if [ $waited -ge $max_wait ]; then
+            warn "等待 apt 锁超时 (${max_wait}s)，尝试强制释放..."
+            killall -9 unattended-upgr 2>/dev/null || true
+            killall -9 apt 2>/dev/null || true
+            sleep 2
+            rm -f /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/cache/apt/archives/lock
+            dpkg --configure -a 2>/dev/null || true
+            break
+        fi
+        info "等待 apt 锁释放... (${waited}s)"
+        sleep 5
+        waited=$((waited + 5))
+    done
+}
+
 # 安装 Node.js
 install_nodejs() {
     if command -v node &> /dev/null; then
@@ -84,10 +104,14 @@ install_nodejs() {
     fi
 
     info "正在安装 Node.js..."
+
+    # 等待 apt 锁释放（unattended-upgrades 等后台进程）
+    wait_for_apt
     
     case "$OS" in
         ubuntu|debian)
             curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+            wait_for_apt
             apt-get install -y nodejs
             ;;
         centos|rhel|fedora|almalinux|rocky)
@@ -160,6 +184,7 @@ install_deps() {
     # 安装 sshpass 用于 SSH 自动部署功能
     info "安装 sshpass (用于 SSH 自动部署)..."
     if command -v apt-get &> /dev/null; then
+        wait_for_apt
         apt-get install -y sshpass > /dev/null 2>&1 || warn "sshpass 安装失败，SSH 自动部署功能可能不可用"
     elif command -v yum &> /dev/null; then
         yum install -y sshpass > /dev/null 2>&1 || warn "sshpass 安装失败，SSH 自动部署功能可能不可用"
